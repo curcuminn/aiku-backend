@@ -46,6 +46,7 @@ import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
 import academicAiRoutes from "./routes/academicAiRoutes";
+import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -626,6 +627,7 @@ app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
 app.use('/api/heartbeat', heartbeatRouter);
+app.use("/api/idea-favorites", startupIdeaFavoriteCountRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

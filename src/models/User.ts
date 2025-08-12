@@ -39,6 +39,7 @@ export interface IUser extends Document {
   favoriteUsers?: mongoose.Types.ObjectId[];
   favoriteCompanies?: mongoose.Types.ObjectId[];
   favoriteProducts?: mongoose.Types.ObjectId[];
+  favoriteIdeas?: string[];
   // Abonelik özellikleri
   subscriptionStatus?: 'active' | 'pending' | 'trial' | 'cancelled' | 'expired';
   subscriptionStartDate?: Date;
@@ -243,6 +244,11 @@ const userSchema = new Schema<IUser>({
     type: Schema.Types.ObjectId,
     ref: 'Product',
     default: []
+  }],
+  favoriteIdeas: [{
+    type: String,
+    trim: true,
+    default: undefined
   }],
   // Abonelik özellikleri
   subscriptionStatus: {
