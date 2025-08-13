@@ -473,12 +473,33 @@ userSchema.methods.checkAutoRenewal = async function () {
           return true;
         } else {
           // Ödeme başarısız ise durumu güncelle
+          if (!this.paymentHistory) this.paymentHistory = [];
+          this.paymentHistory.push({
+            amount: this.subscriptionAmount || 0,
+            date: new Date(),
+            status: 'failed',
+            description: 'Otomatik abonelik yenileme başarısız',
+            type: 'subscription',
+            plan: this.subscriptionPlan,
+            period: this.subscriptionPeriod
+          });
           this.subscriptionStatus = 'expired';
           await this.save();
           return false;
         }
       } catch (error) {
         console.error('Otomatik ödeme işleminde hata:', error);
+        if (!this.paymentHistory) this.paymentHistory = [];
+        this.paymentHistory.push({
+          amount: this.subscriptionAmount || 0,
+          date: new Date(),
+          status: 'failed',
+          description: 'Otomatik abonelik yenileme hata nedeniyle başarısız',
+          type: 'subscription',
+          plan: this.subscriptionPlan,
+          period: this.subscriptionPeriod
+        });
+        await this.save();
         return false;
       }
     } else {
