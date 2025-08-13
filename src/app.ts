@@ -12,6 +12,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
 import { fetchAndStoreNews } from './controllers/newsController';
+import SubscriptionService from './services/SubscriptionService';
 import { ipBlocker } from './middleware/ipBlocker';
 
 // Route'ları import et
@@ -583,6 +584,26 @@ cron.schedule(NEWS_FETCH_SCHEDULE, () => {
   fetchAndStoreNews()
     .then(() => console.log('Haberler güncellendi'))
     .catch(err => console.error('Haber çekme hatası:', err));
+});
+
+const SUBSCRIPTION_CRON_SCHEDULE = process.env.SUBSCRIPTION_CRON_SCHEDULE || '0 4 * * *'; // her gün 04:00
+
+cron.schedule(SUBSCRIPTION_CRON_SCHEDULE, async () => {
+  try {
+    logger.info('⏰ Abonelik cron çalışıyor: trial kontrol');
+    const trialResult = await SubscriptionService.checkTrialEndingUsers();
+    logger.info('Trial kontrol sonucu:', { trialResult });
+
+    logger.info('⏰ Abonelik cron çalışıyor: periyodik ödeme kontrol');
+    const recurringResult = await SubscriptionService.checkRecurringPayments();
+    logger.info('Periyodik ödeme kontrol sonucu:', { recurringResult });
+
+    logger.info('⏰ Abonelik cron çalışıyor: expire işlemleri');
+    const expireResult = await SubscriptionService.expireEndedSubscriptions();
+    logger.info('Expire işlemleri sonucu:', { expireResult });
+  } catch (err) {
+    logger.error('Abonelik cron hatası:', { error: err });
+  }
 });
 
 // MongoDB bağlantısı
