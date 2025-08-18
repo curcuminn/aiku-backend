@@ -149,6 +149,12 @@ class ParamPosService {
             try {
                 this.validatePaymentParams(params);
                 const { amount, cardNumber, cardHolderName, expireMonth, expireYear, cvc, installment = 1, userId, ipAddress = "127.0.0.1", } = params;
+                // Kart numarasının ilk 6 hanesini güvenli şekilde logla
+                if (cardNumber && cardNumber.length >= 6) {
+                    console.log("Kart BIN Numarası (İlk 6 Hane):", cardNumber.substring(0, 6));
+                }
+                // Başarılı URL'ini logla
+                console.log("3D İşlemi için Başarılı URL:", this.successUrl);
                 const orderId = `ORDER_${Date.now()}_${(0, uuid_1.v4)().substring(0, 8)}`;
                 const totalAmount = yield this.calculateCommission(amount, installment);
                 const hash = this.calculateHash({
@@ -222,6 +228,7 @@ class ParamPosService {
                 }
                 return {
                     Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
+                    Islem_GUID: result.Islem_GUID ? result.Islem_GUID[0] : "",
                     UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
                     UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
                     UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
@@ -229,7 +236,10 @@ class ParamPosService {
                     Sonuc: parseInt(result.Sonuc[0]),
                     Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
                     Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
-                    isRedirect: true // Her zaman 3D olduğu için her zaman yönlendirme yapılacak
+                    isRedirect: true,
+                    status: parseInt(result.Sonuc[0]) > 0 ? "pending_3d" : "failure",
+                    success: parseInt(result.Sonuc[0]) > 0,
+                    message: parseInt(result.Sonuc[0]) > 0 ? "3D doğrulama bekliyor" : (result.Sonuc_Str ? result.Sonuc_Str[0] : "")
                 };
             }
             catch (error) {
@@ -245,19 +255,27 @@ class ParamPosService {
     completePayment(params) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { ucdMD, islemId, siparisId, islemGuid } = params;
-                
-                console.log("TP_WMD_Pay Request Params:", JSON.stringify(params, null, 2));
-                
-                if (!ucdMD || !islemId || !siparisId) {
+                const { ucdMD, siparisId, islemGuid } = params;
+                console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
+                    ucdMD,
+                    siparisId,
+                    islemGuid,
+                    clientCode: this.clientCode,
+                    clientUsername: this.clientUsername,
+                    guid: this.guid
+                });
+                if (!ucdMD || !siparisId) {
                     throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
                 }
-                
-                // Eğer islemGuid yoksa, islemId kullan
-                const transactionId = islemGuid || islemId;
-                
+                // islemGuid yoksa boş string kullan
+                const transactionId = islemGuid || "";
+                //console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
+                // MD değerinin ilk 6 hanesi genellikle kart numarasının başlangıcı olabilir
+                if (typeof ucdMD === 'string' && ucdMD.length >= 6) {
+                    console.log("Kart İlk 6 Hane:", ucdMD.substring(0, 6));
+                }
                 const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
             <TP_WMD_Pay xmlns="https://turkpos.com.tr/">
               <G>
@@ -281,6 +299,7 @@ class ParamPosService {
                 });
                 console.log("TP_WMD_Pay Yanıtı:", response.data);
                 const parsedResponse = yield this.parseSoapResponse(response.data);
+                console.log("TP_WMD_Pay Ayrıştırılmış Yanıt:", JSON.stringify(parsedResponse, null, 2));
                 if (!parsedResponse["TP_WMD_PayResponse"] ||
                     !parsedResponse["TP_WMD_PayResponse"][0] ||
                     !parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"] ||
@@ -289,21 +308,54 @@ class ParamPosService {
                     throw new Error("Geçersiz ödeme tamamlama yanıtı formatı");
                 }
                 const result = parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"][0];
-                // Başarısız işlem kontrolü
-                if (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) === -1) {
-                    throw new Error(result.Sonuc_Str[0] || "Ödeme tamamlama işlemi başarısız");
+                console.log("TP_WMD_Pay Sonuç:", JSON.stringify(result, null, 2));
+                // Sonuç kontrolleri - undefined veya eksik alanlar için koruma
+                if (!result.Sonuc) {
+                    console.error("TP_WMD_Pay hata: Sonuç alanı bulunamadı");
+                    throw new Error("Ödeme sonucu alınamadı");
                 }
-                return {
-                    TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc[0]),
-                    TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str[0],
+                // Başarısız işlem kontrolü
+                if (Array.isArray(result.Sonuc) && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+                    // Daha detaylı hata mesajı oluştur (Sonuc_Ack varsa kullan)
+                    const errorDetails = Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0
+                        ? result.Sonuc_Ack[0]
+                        : (Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0
+                            ? result.Sonuc_Str[0]
+                            : "Bilinmeyen hata");
+                    console.error(`TP_WMD_Pay Hata (Kod: ${result.Sonuc[0]}): ${errorDetails}`);
+                    throw new Error(`Ödeme tamamlama işlemi başarısız. ${errorDetails}`);
+                }
+                const paymentResponse = {
+                    TURKPOS_RETVAL_Sonuc: Array.isArray(result.Sonuc) ? parseInt(result.Sonuc[0]) : 0,
+                    TURKPOS_RETVAL_Sonuc_Str: Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0
+                        ? result.Sonuc_Str[0]
+                        : (Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0
+                            ? result.Sonuc_Ack[0]
+                            : "Sonuç açıklaması alınamadı"),
                     TURKPOS_RETVAL_GUID: this.guid,
                     TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
-                    TURKPOS_RETVAL_Dekont_ID: result.Dekont_ID ? result.Dekont_ID[0] : "",
-                    TURKPOS_RETVAL_Tahsilat_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
-                    TURKPOS_RETVAL_Odeme_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
+                    TURKPOS_RETVAL_Dekont_ID: Array.isArray(result.Dekont_ID) && result.Dekont_ID.length > 0
+                        ? result.Dekont_ID[0]
+                        : "",
+                    TURKPOS_RETVAL_Tahsilat_Tutari: Array.isArray(result.Odeme_Tutari) && result.Odeme_Tutari.length > 0
+                        ? result.Odeme_Tutari[0]
+                        : "0",
+                    TURKPOS_RETVAL_Odeme_Tutari: Array.isArray(result.Odeme_Tutari) && result.Odeme_Tutari.length > 0
+                        ? result.Odeme_Tutari[0]
+                        : "0",
                     TURKPOS_RETVAL_Siparis_ID: siparisId,
-                    TURKPOS_RETVAL_Islem_ID: islemId,
+                    TURKPOS_RETVAL_Islem_ID: "", // Boş string döndür
+                    // Frontend için açık durum bilgisi ekle
+                    status: Array.isArray(result.Sonuc) && parseInt(result.Sonuc[0]) > 0 ? "success" : "failure",
+                    success: Array.isArray(result.Sonuc) && parseInt(result.Sonuc[0]) > 0 ? true : false,
+                    message: Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0
+                        ? result.Sonuc_Str[0]
+                        : (Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0
+                            ? result.Sonuc_Ack[0]
+                            : "")
                 };
+                console.log("TP_WMD_Pay İşlem Sonucu:", JSON.stringify(paymentResponse, null, 2));
+                return paymentResponse;
             }
             catch (error) {
                 console.error("Ödeme tamamlama hatası:", error);
@@ -322,6 +374,24 @@ class ParamPosService {
                 params.is3D = true;
                 // İlk adım: 3D ekranını alma
                 const initResponse = yield this.initializePayment(params);
+                // Islem_GUID kontrolü yap
+                if (!initResponse.Islem_GUID) {
+                    console.warn("TP_WMD_UCD yanıtında Islem_GUID bulunamadı! Bu, ödeme tamamlama adımında sorunlara neden olabilir.");
+                }
+                else {
+                    console.log("TP_WMD_UCD Islem_GUID:", initResponse.Islem_GUID);
+                }
+                // UCD_MD değerini logla - Bu, 3D yönlendirmeyle ilgili önemli bir bilgidir
+                if (initResponse.UCD_MD) {
+                    console.log("3D Yönlendirme MD Değeri:", initResponse.UCD_MD);
+                    // MD değeri genelde kart numarasının ilk 6 hanesiyle başlar
+                    if (typeof initResponse.UCD_MD === 'string' && initResponse.UCD_MD.length >= 6) {
+                        console.log("3D MD değerindeki kart bilgisi (ilk 6):", initResponse.UCD_MD.substring(0, 6));
+                    }
+                }
+                // 3D yönlendirme URL'ini veya HTML'ini logla
+                console.log("3D Yönlendirme içeriği tipi:", initResponse.UCD_HTML ? "HTML" :
+                    initResponse.UCD_URL ? "URL" : "Bilinmiyor");
                 // Hangi içerik dönmüşse onu kullan (UCD_HTML veya UCD_URL)
                 const redirectContent = initResponse.UCD_HTML || initResponse.UCD_URL || "";
                 // 3D işleminde her zaman URL veya HTML içeriğini döndür
@@ -335,11 +405,18 @@ class ParamPosService {
                     TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
                     TURKPOS_RETVAL_Siparis_ID: initResponse.Siparis_ID,
                     TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
+                    TURKPOS_RETVAL_Islem_GUID: initResponse.Islem_GUID,
                     UCD_URL: initResponse.UCD_URL,
                     UCD_HTML: initResponse.UCD_HTML,
                     UCD_MD: initResponse.UCD_MD,
                     isRedirect: true,
-                    html: redirectContent
+                    html: redirectContent,
+                    // Frontend için durum bilgisi ekle - İlk aşama 0'dan büyük ise başarılı
+                    status: initResponse.Sonuc > 0 ? "pending_3d" : "failure",
+                    success: initResponse.Sonuc > 0,
+                    message: initResponse.Sonuc > 0
+                        ? "3D doğrulama bekliyor"
+                        : initResponse.Sonuc_Str
                 };
                 // Not: Burada ikinci adım olan completePayment() metodu kullanıcı 3D sayfasını 
                 // doğruladıktan sonra callback URL'inden çağrılacak

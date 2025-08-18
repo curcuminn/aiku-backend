@@ -33,7 +33,7 @@ const createProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         const userId = decoded.id;
-        const { productName, productLogo, productCategory, productDescription, detailedDescription, tags, problems, solutions, improvements, keyFeatures, pricingModel, releaseDate, productPrice, productWebsite, productLinkedIn, productTwitter, companyName, companyId, } = req.body;
+        const { productName, productLogo, productCategory, productDescription, detailedDescription, tags, problems, solutions, improvements, keyFeatures, pricingModel, releaseDate, productPrice, productWebsite, productLinkedIn, productTwitter, isHighlighted, companyName, companyId, } = req.body;
         // Yeni ürün oluştur
         const product = yield Product_1.Product.create({
             productName,
@@ -52,6 +52,7 @@ const createProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             productWebsite,
             productLinkedIn,
             productTwitter,
+            isHighlighted,
             companyName,
             companyId,
             user: userId,
@@ -169,10 +170,15 @@ exports.getProductsByCompany = getProductsByCompany;
 const getAllProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Ürünleri getir ve ilgili şirket bilgilerini al
-        const products = yield Product_1.Product.find().populate('companyId', 'companyName companyLogo');
-        // console.log("User from req.user:", req.user); 
-        // Kullanıcı giriş yapmış olsa bile artık abonelik kontrolü YOK!
-        return res.status(200).json({ success: true, products });
+        const products = yield Product_1.Product.find()
+            .populate({
+            path: "user",
+            select: "accountStatus",
+            match: { accountStatus: "active" }
+        })
+            .populate("companyId", "companyName companyLogo");
+        const activeProducts = products.filter((p) => p.user);
+        return res.status(200).json({ success: true, products: activeProducts });
     }
     catch (err) {
         console.error("❌ Sunucu hatası:", err.message);

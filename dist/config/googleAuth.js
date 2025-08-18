@@ -24,6 +24,12 @@ const googleClient = new google_auth_library_1.OAuth2Client({
     redirectUri: `${process.env.API_URL}/api/auth/google/callback`
 });
 exports.googleClient = googleClient;
+// Desteklenen client ID'ler
+const SUPPORTED_CLIENT_IDS = [
+    process.env.GOOGLE_CLIENT_ID, // Web client ID
+    '940825068315-erm1cg6j87lqnldrbohmgvfd2ig0cr2f.apps.googleusercontent.com', // iOS client ID
+    '940825068315-11h2cdsluv3a8o3t019pf5hq4dnc4721.apps.googleusercontent.com' // Android client ID
+];
 /**
  * Google ID token'ı doğrular
  * @param idToken Google tarafından verilen ID token
@@ -40,7 +46,7 @@ const verifyGoogleToken = (idToken) => __awaiter(void 0, void 0, void 0, functio
         // - Windows: "Tarih ve Saat" ayarlarında "Internet Saati" sekmesinden güncelleme yapılabilir.
         const ticket = yield googleClient.verifyIdToken({
             idToken,
-            audience: process.env.GOOGLE_CLIENT_ID
+            audience: SUPPORTED_CLIENT_IDS
         });
         const payload = ticket.getPayload();
         if (!payload) {
@@ -48,7 +54,8 @@ const verifyGoogleToken = (idToken) => __awaiter(void 0, void 0, void 0, functio
         }
         console.log('[GoogleAuth] Token doğrulandı:', {
             sub: payload.sub,
-            email: payload.email
+            email: payload.email,
+            aud: payload.aud // Hangi client ID ile giriş yapıldığını logla
         });
         return {
             uid: payload.sub,

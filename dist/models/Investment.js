@@ -35,6 +35,18 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Investment = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+const CompletedInvestmentSchema = new mongoose_1.Schema({
+    amount: {
+        type: Number,
+        default: 0,
+        min: [0, 'Completed investment cannot be negative'],
+    },
+    description: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+}, { _id: false });
 const investmentSchema = new mongoose_1.Schema({
     investmentTitle: {
         type: String,
@@ -53,12 +65,10 @@ const investmentSchema = new mongoose_1.Schema({
     },
     productName: {
         type: String,
-        required: [true, 'Product name is required'],
         trim: true,
     },
     productId: {
         type: mongoose_1.default.Schema.Types.ObjectId,
-        required: [true, 'Product ID is required'],
         ref: 'Product',
     },
     targetedInvestment: {
@@ -89,6 +99,11 @@ const investmentSchema = new mongoose_1.Schema({
         type: String,
         trim: true,
     },
+    completedInvestments: {
+        type: [CompletedInvestmentSchema],
+        default: [],
+        required: true,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
@@ -97,8 +112,18 @@ const investmentSchema = new mongoose_1.Schema({
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
 });
+// Virtual: okunabilir format
+investmentSchema
+    .virtual('completedInvestmentDisplay')
+    .get(function () {
+    return this.completedInvestments
+        .map(ci => `${ci.amount.toLocaleString()} – ${ci.description}`)
+        .join(', ');
+});
+// Slug virtual’ı
 investmentSchema.virtual('slug').get(function () {
-    return `${this.companyName} ${this.productName}`
+    const prodPart = this.productName ? ` ${this.productName}` : '';
+    return `${this.companyName}${prodPart}`
         .toLowerCase()
         .replace(/ /g, '-')
         .replace(/[^\w-]+/g, '');

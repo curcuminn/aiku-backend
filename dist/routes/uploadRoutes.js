@@ -8,15 +8,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const upload_1 = require("../config/upload");
 const auth_1 = require("../middleware/auth");
 const Company_1 = require("../models/Company");
 const Product_1 = require("../models/Product");
+const InvestmentNews_1 = require("../models/InvestmentNews");
+const Hub_1 = require("../models/Hub");
+const Blog_1 = require("../models/Blog");
 const TeamMember_1 = require("../models/TeamMember");
 const Investment_1 = require("../models/Investment");
 const fileUtils_1 = require("../utils/fileUtils");
+const logger_1 = __importDefault(require("../config/logger"));
 const router = (0, express_1.Router)();
 // Takım Üyesi Profil Fotoğrafı Yükleme / Güncelleme
 router.post('/team-member-profile-photo/:teamMemberId', auth_1.protect, upload_1.upload.single('photo'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -55,6 +62,9 @@ router.post('/team-member-profile-photo/:teamMemberId', auth_1.protect, upload_1
             message: 'Dosya yükleme hatası',
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
         });
+        logger_1.default.error('Dosya yükleme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
     }
 }));
 // Takım Üyesi Profil Fotoğrafı Silme
@@ -81,6 +91,9 @@ router.delete('/team-member-profile-photo/:teamMemberId', auth_1.protect, (req, 
         res.status(500).json({
             success: false,
             message: 'Dosya silme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        logger_1.default.error('Dosya silme hatası', {
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
         });
     }
@@ -119,6 +132,9 @@ router.post('/profile-photo', auth_1.protect, upload_1.upload.single('photo'), (
             message: 'Dosya yükleme hatası',
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
         });
+        logger_1.default.error('Dosya yükleme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
     }
 }));
 // Profil fotoğrafı silme
@@ -138,6 +154,9 @@ router.delete('/profile-photo', auth_1.protect, (req, res) => __awaiter(void 0, 
         res.status(500).json({
             success: false,
             message: 'Dosya silme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        logger_1.default.error('Dosya silme hatası', {
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
         });
     }
@@ -179,6 +198,9 @@ router.post('/company-logo/:companyId', auth_1.protect, upload_1.upload.single('
         res.status(500).json({
             success: false,
             message: 'Dosya yükleme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        logger_1.default.error('Dosya yükleme hatası', {
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
         });
     }
@@ -370,6 +392,214 @@ router.post('/document', auth_1.protect, upload_1.upload.single('document'), (re
             success: false,
             message: 'Dosya yükleme hatası',
             error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+    }
+}));
+router.post('/blog-cover/:blogId', auth_1.protect, upload_1.upload.single('cover'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Lütfen bir dosya yükleyin'
+            });
+        }
+        const blog = yield Blog_1.Blog.findById(req.params.blogId);
+        if (!blog) {
+            return res.status(404).json({
+                success: false,
+                message: 'Blog bulunamadı'
+            });
+        }
+        // Eski cover fotoğrafını sil
+        if (blog.coverPhoto) {
+            (0, fileUtils_1.deleteFile)(blog.coverPhoto);
+        }
+        // Yeni dosya yolu
+        const fileUrl = `/uploads/images/${req.file.filename}`;
+        // Blog coverPhoto alanını güncelle
+        blog.coverPhoto = fileUrl;
+        yield blog.save();
+        res.status(200).json({
+            success: true,
+            message: 'Blog cover fotoğrafı başarıyla yüklendi',
+            data: { url: fileUrl }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Blog cover yükleme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Dosya yükleme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+    }
+}));
+// **Blog Cover Fotoğrafı Silme**
+router.delete('/blog-cover/:blogId', auth_1.protect, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const blog = yield Blog_1.Blog.findById(req.params.blogId);
+        if (!blog) {
+            return res.status(404).json({
+                success: false,
+                message: 'Blog bulunamadı'
+            });
+        }
+        if (blog.coverPhoto) {
+            (0, fileUtils_1.deleteFile)(blog.coverPhoto);
+            blog.coverPhoto = null;
+            yield blog.save();
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Blog cover fotoğrafı başarıyla silindi'
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Blog cover silme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Dosya silme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+    }
+}));
+// InvestmentNews kapak görseli yükleme
+router.post('/investment-news-cover/:newsId', auth_1.protect, upload_1.upload.single('cover'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Lütfen bir dosya yükleyin'
+            });
+        }
+        const news = yield InvestmentNews_1.InvestmentNews.findById(req.params.newsId);
+        if (!news) {
+            return res.status(404).json({
+                success: false,
+                message: 'Yatırım haberi bulunamadı'
+            });
+        }
+        // Eski görsel varsa sil
+        if (news.coverPhoto) {
+            (0, fileUtils_1.deleteFile)(news.coverPhoto);
+        }
+        const fileUrl = `/uploads/images/${req.file.filename}`;
+        news.coverPhoto = fileUrl;
+        yield news.save();
+        res.status(200).json({
+            success: true,
+            message: 'Kapak görseli başarıyla yüklendi',
+            data: { url: fileUrl }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('InvestmentNews cover yükleme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Yükleme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+    }
+}));
+// InvestmentNews kapak görseli silme
+router.delete('/investment-news-cover/:newsId', auth_1.protect, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const news = yield InvestmentNews_1.InvestmentNews.findById(req.params.newsId);
+        if (!news) {
+            return res.status(404).json({
+                success: false,
+                message: 'Yatırım haberi bulunamadı'
+            });
+        }
+        if (news.coverPhoto) {
+            (0, fileUtils_1.deleteFile)(news.coverPhoto);
+            news.coverPhoto = null;
+            yield news.save();
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Kapak görseli başarıyla silindi'
+        });
+    }
+    catch (error) {
+        logger_1.default.error('InvestmentNews cover silme hatası', {
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Silme hatası',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        });
+    }
+}));
+// Hub logosu yükleme/güncelleme
+router.post('/hub-logo/:hubId', auth_1.protect, upload_1.upload.single('logo'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please upload a file'
+            });
+        }
+        const hub = yield Hub_1.Hub.findById(req.params.hubId);
+        if (!hub) {
+            return res.status(404).json({
+                success: false,
+                message: 'Hub not found'
+            });
+        }
+        // Eski logoyu sil
+        if (hub.logoUrl) {
+            (0, fileUtils_1.deleteFile)(hub.logoUrl);
+        }
+        const fileUrl = `/uploads/images/${req.file.filename}`;
+        hub.logoUrl = fileUrl;
+        yield hub.save();
+        res.status(200).json({
+            success: true,
+            message: 'Hub logo uploaded successfully',
+            data: { url: fileUrl }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'File upload error',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}));
+// Hub logosu silme
+router.delete('/hub-logo/:hubId', auth_1.protect, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const hub = yield Hub_1.Hub.findById(req.params.hubId);
+        if (!hub) {
+            return res.status(404).json({
+                success: false,
+                message: 'Hub not found'
+            });
+        }
+        if (hub.logoUrl) {
+            (0, fileUtils_1.deleteFile)(hub.logoUrl);
+            hub.logoUrl = undefined;
+            yield hub.save();
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Hub logo deleted successfully'
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'File deletion error',
+            error: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 }));

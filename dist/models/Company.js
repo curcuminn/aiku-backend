@@ -65,13 +65,17 @@ const companySchema = new mongoose_1.Schema({
         enum: ['B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', 'B2B2C'],
     },
     companySector: {
-        type: String,
-        required: [true, 'Company sector is required'],
+        type: [String],
+        default: [],
     },
     companySize: {
         type: String,
         required: [true, 'Company size is required'],
         enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+'],
+    },
+    fundSize: {
+        type: String,
+        trim: true,
     },
     businessScale: {
         type: String,
@@ -80,17 +84,30 @@ const companySchema = new mongoose_1.Schema({
     },
     companyEmail: {
         type: String,
-        required: [true, 'Company email is required'],
+        // required: [true, 'Company email is required'],
         trim: true,
         lowercase: true,
         unique: true,
+        sparse: true,
         match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.[A-Za-z]{2,})+$/, 'Please enter a valid email address'],
     },
     companyPhone: {
         type: String,
-        required: [true, 'Company phone is required'],
+        // required: [true, 'Company phone is required'],
         trim: true,
+        sparse: true,
         match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'],
+        set: (value) => value.replace(/[^\d+]/g, ''),
+    },
+    countryCode: {
+        type: String,
+        // required: [true, 'Country code is required'],
+        trim: true,
+    },
+    localPhone: {
+        type: String,
+        // required: [true, 'Local phone number is required'],
+        trim: true,
     },
     companyInfo: {
         type: String,
@@ -106,9 +123,9 @@ const companySchema = new mongoose_1.Schema({
         type: String,
         trim: true,
         match: [
-            /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,6}\.?)(\/[\w.-]*)*\/?$/,
+            /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,})(\.[a-z]{2,})?(\/[\w.-]*)*\/?$/i,
             'Please enter a valid URL',
-        ],
+        ]
     },
     companyAddress: {
         type: String,
@@ -147,10 +164,33 @@ const companySchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    isHighlighted: {
+        type: Boolean,
+        default: false,
+    },
+    acceptMessages: {
+        type: Boolean,
+        default: true,
+    },
+    numberOfInvestments: {
+        type: Number,
+        default: 0,
+        min: [0, 'Number of investments cannot be negative'],
+    },
+    numberOfExits: {
+        type: Number,
+        default: 0,
+        min: [0, 'Number of exits cannot be negative'],
+    },
     user: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         required: [true, 'User ID is required'],
         ref: 'User',
+    },
+    connectedHub: {
+        type: mongoose_1.default.Schema.Types.ObjectId,
+        ref: 'Hub',
+        default: null,
     },
     createdAt: {
         type: Date,

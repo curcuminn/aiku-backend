@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,6 +21,14 @@ const socket_io_1 = require("socket.io");
 const http_1 = __importDefault(require("http"));
 const passport_1 = __importDefault(require("./config/passport"));
 const cors_1 = __importDefault(require("cors"));
+const logger_1 = __importDefault(require("./config/logger"));
+const httpLogger_1 = __importDefault(require("./middleware/httpLogger"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const helmet_1 = __importDefault(require("helmet"));
+const node_cron_1 = __importDefault(require("node-cron"));
+const newsController_1 = require("./controllers/newsController");
+const SubscriptionService_1 = __importDefault(require("./services/SubscriptionService"));
+const ipBlocker_1 = require("./middleware/ipBlocker");
 // Route'ları import et
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const companyRoutes_1 = __importDefault(require("./routes/companyRoutes"));
@@ -28,67 +45,126 @@ const investmentRoutes_1 = __importDefault(require("./routes/investmentRoutes"))
 const linkedinAuth_routes_1 = __importDefault(require("./routes/linkedinAuth.routes"));
 const supabaseAuth_routes_1 = __importDefault(require("./routes/supabaseAuth.routes"));
 const chatRoutes_1 = __importDefault(require("./routes/chatRoutes"));
+const billingInfoRoutes_1 = __importDefault(require("./routes/billingInfoRoutes"));
+const complaintRoutes_1 = __importDefault(require("./routes/complaintRoutes"));
+const exchangeRateRoutes_1 = __importDefault(require("./routes/exchangeRateRoutes"));
+const couponRoutes_1 = __importDefault(require("./routes/couponRoutes"));
+const clickTrackRoutes_1 = __importDefault(require("./routes/clickTrackRoutes"));
+const newsRoutes_1 = __importDefault(require("./routes/newsRoutes"));
+const panelUserRoutes_1 = __importDefault(require("./routes/panelUserRoutes"));
+const blogRoutes_1 = __importDefault(require("./routes/blogRoutes"));
+const investmentNewsRoutes_1 = __importDefault(require("./routes/investmentNewsRoutes"));
+const hubRoutes_1 = __importDefault(require("./routes/hubRoutes"));
+const claimRequestRoutes_1 = __importDefault(require("./routes/claimRequestRoutes"));
+const heartbeat_1 = __importDefault(require("./routes/heartbeat"));
+const metaConversionsRoutes_1 = __importDefault(require("./routes/metaConversionsRoutes"));
+const modalMessageRoutes_1 = __importDefault(require("./routes/modalMessageRoutes"));
+const updateOnlineStatus_1 = require("./updateOnlineStatus");
+const User_1 = require("./models/User");
+const academicAiRoutes_1 = __importDefault(require("./routes/academicAiRoutes"));
+const revenueCatRoutes_1 = __importDefault(require("./routes/revenueCatRoutes"));
 // Env değişkenlerini yükle
 dotenv_1.default.config();
 // Express uygulamasını oluştur
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
+// IP engelleyici middleware'i ekle (en üstte olmalı)
+app.use(ipBlocker_1.ipBlocker);
+// Proxy güven ayarları
+app.set("trust proxy", 1); // Sadece bir proxy'ye güven
 // CORS için izin verilen domainler
 const whitelist = [
-    'https://aikuaiplatform.com',
-    'https://www.aikuaiplatform.com',
-    'https://api.aikuaiplatform.com',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3004',
-    'http://127.0.0.1:5500',
-    'https://bevakpqfycmxnpzrkecv.supabase.co'
+    "https://aikuaiplatform.com",
+    "https://www.aikuaiplatform.com",
+    "https://api.aikuaiplatform.com",
+    "https://www.alohadijital.com",
+    "https://alohadijital.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3004",
+    "http://127.0.0.1:5500",
+    "https://bevakpqfycmxnpzrkecv.supabase.co",
+    "https://posws.param.com.tr"
 ];
+// 30 saniyelik eşik
+const OFFLINE_AFTER_MS = 30000;
+// Her 30 saniyede bir, sonSeen < (NOW - 30s) olanları kapat
+node_cron_1.default.schedule('*/30 * * * * *', () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const cutoff = new Date(Date.now() - OFFLINE_AFTER_MS);
+        const result = yield User_1.User.updateMany({ isOnline: true, lastSeen: { $lt: cutoff } }, { $set: { isOnline: false } });
+        // Mongoose 6’da UpdateResult.modifiedCount kullanılır
+        if (result.modifiedCount && result.modifiedCount > 0) {
+            console.log(`⏱️ ${result.modifiedCount} kullanıcı offline olarak işaretlendi`);
+        }
+    }
+    catch (err) {
+        console.error('Offline cron error:', err);
+    }
+}));
 // Socket.io sunucusunu oluştur
 const io = new socket_io_1.Server(server, {
     cors: {
         origin: "*", // Tüm kaynaklara izin ver (geliştirme için)
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"]
+        allowedHeaders: ["Content-Type", "Authorization"],
     },
     allowEIO3: true, // Engine.IO 3 uyumluluğu
-    transports: ['websocket', 'polling'] // Önce WebSocket, sonra polling dene
+    transports: ["websocket", "polling"], // Önce WebSocket, sonra polling dene
 });
 exports.io = io;
 // Socket.io bağlantılarını yönet
-io.on('connection', (socket) => {
-    console.log('👋 Yeni bir kullanıcı bağlandı:', socket.id);
+io.on("connection", (socket) => {
+    console.log("👋 Yeni bir kullanıcı bağlandı:", socket.id);
+    logger_1.default.debug("Yeni Socket.IO bağlantısı kuruldu", { socketId: socket.id });
     // Şirket id'sine göre chat odası katılımı
-    socket.on('join-company-chat', (companyId) => {
+    socket.on("join-company-chat", (companyId) => {
         socket.join(`company-${companyId}`);
         console.log(`🏢 ${socket.id} kullanıcısı ${companyId} şirket odasına katıldı`);
+        logger_1.default.debug("Kullanıcı şirket chat odasına katıldı", {
+            socketId: socket.id,
+            companyId,
+        });
     });
     // Sohbet oturum id'sine göre chat odası katılımı
-    socket.on('join-chat-session', (chatSessionId) => {
+    socket.on("join-chat-session", (chatSessionId) => {
         socket.join(`chat-${chatSessionId}`);
         console.log(`💬 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasına katıldı`);
+        logger_1.default.debug("Kullanıcı sohbet odasına katıldı", {
+            socketId: socket.id,
+            chatSessionId,
+        });
     });
     // Özel chat odalarından ayrılma
-    socket.on('leave-company-chat', (companyId) => {
+    socket.on("leave-company-chat", (companyId) => {
         socket.leave(`company-${companyId}`);
         console.log(`🚪 ${socket.id} kullanıcısı ${companyId} şirket odasından ayrıldı`);
+        logger_1.default.debug("Kullanıcı şirket chat odasından ayrıldı", {
+            socketId: socket.id,
+            companyId,
+        });
     });
-    socket.on('leave-chat-session', (chatSessionId) => {
+    socket.on("leave-chat-session", (chatSessionId) => {
         socket.leave(`chat-${chatSessionId}`);
         console.log(`🚪 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasından ayrıldı`);
+        logger_1.default.debug("Kullanıcı sohbet odasından ayrıldı", {
+            socketId: socket.id,
+            chatSessionId,
+        });
     });
     // Bağlantı kesildiğinde
-    socket.on('disconnect', () => {
-        console.log('👋 Bir kullanıcı ayrıldı:', socket.id);
+    socket.on("disconnect", () => {
+        console.log("👋 Bir kullanıcı ayrıldı:", socket.id);
+        logger_1.default.debug("Socket.IO bağlantısı kesildi", { socketId: socket.id });
     });
 });
 // CORS origin kontrolü için fonksiyon
 const corsOriginCheck = (origin, callback) => {
-    console.log('🔒 CORS isteği origin:', origin);
+    console.log("🔒 CORS isteği origin:", origin);
     // Development ortamında tüm originlere izin ver
-    if (process.env.NODE_ENV === 'development') {
-        console.log('💻 Development modu: Tüm CORS isteklerine izin veriliyor');
+    if (process.env.NODE_ENV === "development") {
+        console.log("💻 Development modu: Tüm CORS isteklerine izin veriliyor");
         callback(null, true);
         return;
     }
@@ -111,24 +187,31 @@ const corsOriginCheck = (origin, callback) => {
     // Localhost ve 127.0.0.1 için port kontrolünü gevşet (development için)
     const localDevRegex = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
     if (localDevRegex.test(origin)) {
-        console.log('🧪 Yerel test origin\'i kabul edildi:', origin);
+        console.log("🧪 Yerel test origin'i kabul edildi:", origin);
         callback(null, true);
         return;
     }
     // Diğer tüm istekleri reddet
     console.log(`⛔ CORS engellendi: ${origin}`);
-    callback(new Error('CORS politikası tarafından engellendi'));
+    logger_1.default.warn("CORS politikası tarafından engellenen istek", { origin });
+    callback(new Error("CORS politikası tarafından engellendi"));
 };
 // CORS ayarları
 const corsOptions = {
     origin: corsOriginCheck,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Accept",
+    ],
+    exposedHeaders: ["Content-Range", "X-Content-Range"],
     preflightContinue: false,
     optionsSuccessStatus: 204,
-    maxAge: 86400 // Preflight sonuçlarını 24 saat önbelleğe al
+    maxAge: 86400, // Preflight sonuçlarını 24 saat önbelleğe al
 };
 // Body parsing middleware'lerini ekle
 app.use(express_1.default.json());
@@ -137,33 +220,40 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cors_1.default)(corsOptions));
 // CORS hata yakalama middleware'i
 app.use((err, req, res, next) => {
-    if (err.name === 'CORSError') {
-        console.error('❌ CORS Hatası:', err.message);
+    if (err.name === "CORSError") {
+        console.error("❌ CORS Hatası:", err.message);
+        logger_1.default.error("CORS Hatası", {
+            error: err.message,
+            url: req.url,
+            origin: req.headers.origin,
+        });
         return res.status(403).json({
             success: false,
-            message: 'CORS hatası: İstek engellendi',
-            error: err.message
+            message: "CORS hatası: İstek engellendi",
+            error: err.message,
         });
     }
     next(err);
 });
 // OPTIONS istekleri için özel işleyici
-app.options('*', (0, cors_1.default)(corsOptions));
+app.options("*", (0, cors_1.default)(corsOptions));
+// HTTP Logger middleware'ini ekle
+app.use(httpLogger_1.default);
 // İstek loglaması için middleware
 app.use((req, res, next) => {
-    const origin = req.headers.origin || '';
+    const origin = req.headers.origin || "";
     const method = req.method;
     const url = req.url;
     // İstek loglaması
     console.log(`🔄 İstek - Origin: ${origin}, Method: ${method}, URL: ${url}`);
     // CORS başlıklarını kontrol et ve logla
     const corsHeaders = {
-        'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
-        'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
-        'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
-        'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+        "Access-Control-Allow-Origin": res.getHeader("Access-Control-Allow-Origin"),
+        "Access-Control-Allow-Methods": res.getHeader("Access-Control-Allow-Methods"),
+        "Access-Control-Allow-Headers": res.getHeader("Access-Control-Allow-Headers"),
+        "Access-Control-Allow-Credentials": res.getHeader("Access-Control-Allow-Credentials"),
     };
-    console.log('🔑 CORS Başlıkları:', corsHeaders);
+    console.log("🔑 CORS Başlıkları:", corsHeaders);
     next();
 });
 // Test için Google OAuth sayfasıa
@@ -316,6 +406,34 @@ app.get("/test-google-auth", (req, res) => {
 // Hata yakalama middleware'i
 app.use((err, req, res, next) => {
     console.error("❌ Sunucu Hatası:", err);
+    // Daha detaylı hata logu
+    logger_1.default.error("Sunucu Hatası", {
+        error: {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+            code: err.code,
+        },
+        request: {
+            url: req.url,
+            method: req.method,
+            path: req.path,
+            query: req.query,
+            params: req.params,
+            headers: {
+                "user-agent": req.headers["user-agent"],
+                "content-type": req.headers["content-type"],
+                host: req.headers.host,
+            },
+        },
+        user: req.user
+            ? {
+                id: req.user.id,
+                email: req.user.email,
+            }
+            : null,
+        timestamp: new Date().toISOString(),
+    });
     res.status(err.status || 500).json({
         message: err.message || "Sunucu hatası",
         error: process.env.NODE_ENV === "development" ? err : {},
@@ -331,11 +449,112 @@ app.use("/test", express_1.default.static(path_1.default.join(__dirname, "../tes
 app.get("/socket-test", (_req, res) => {
     res.sendFile(path_1.default.join(__dirname, "../test/socket-test.html"));
 });
+// Güvenlik başlıkları
+app.use((0, helmet_1.default)());
+// XSS koruması için Content Security Policy
+app.use(helmet_1.default.contentSecurityPolicy({
+    directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "accounts.google.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://api.aikuaiplatform.com"],
+        fontSrc: ["'self'", "https:", "data:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'self'", "accounts.google.com"],
+    },
+}));
+// Rate limiting ayarları
+const limiter = (0, express_rate_limit_1.default)({
+    windowMs: 10 * 60 * 1000, // 10 dakika
+    max: process.env.NODE_ENV === 'development' ? Infinity : 750, // Development'da sınırsız, production'da 200
+    message: "Too many requests, please try again later.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        logger_1.default.warn("Rate limit exceeded", {
+            ip: req.ip,
+            realIP: req.headers["x-real-ip"],
+            forwardedFor: req.headers["x-forwarded-for"],
+            url: req.url,
+            headers: req.headers,
+        });
+        res.status(429).json({
+            error: "Too many requests, please try again later."
+        });
+    },
+    // Rate limit için IP belirleme fonksiyonu
+    keyGenerator: (req) => {
+        var _a, _b;
+        return ((_a = req.headers["x-forwarded-for"]) === null || _a === void 0 ? void 0 : _a.toString()) ||
+            ((_b = req.headers["x-real-ip"]) === null || _b === void 0 ? void 0 : _b.toString()) ||
+            req.ip ||
+            req.connection.remoteAddress ||
+            'unknown';
+    }
+});
+// Tüm route'lara rate limiting uygula
+app.use(limiter);
+// Şüpheli istekleri engelle
+app.use((req, res, next) => {
+    const suspiciousPatterns = [
+        /eval-stdin\.php/i,
+        /phpunit/i,
+        /think\\app/i,
+        /pearcmd/i,
+        /\.env/i,
+        /wp-content/i,
+        /wp-admin/i,
+        /wp-login/i,
+    ];
+    const url = req.url.toLowerCase();
+    if (suspiciousPatterns.some((pattern) => pattern.test(url))) {
+        logger_1.default.warn("Şüpheli istek engellendi", {
+            ip: req.ip,
+            url: req.url,
+            method: req.method,
+            headers: req.headers,
+        });
+        return res.status(403).json({ error: "İstek engellendi" });
+    }
+    next();
+});
+const NEWS_FETCH_SCHEDULE = process.env.NEWS_FETCH_CRON_SCHEDULE || '0 3 * * *';
+node_cron_1.default.schedule(NEWS_FETCH_SCHEDULE, () => {
+    (0, newsController_1.fetchAndStoreNews)()
+        .then(() => console.log('Haberler güncellendi'))
+        .catch(err => console.error('Haber çekme hatası:', err));
+});
+const SUBSCRIPTION_CRON_SCHEDULE = process.env.SUBSCRIPTION_CRON_SCHEDULE || '0 4 * * *'; // her gün 04:00
+node_cron_1.default.schedule(SUBSCRIPTION_CRON_SCHEDULE, () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        logger_1.default.info('⏰ Abonelik cron çalışıyor: trial kontrol');
+        const trialResult = yield SubscriptionService_1.default.checkTrialEndingUsers();
+        logger_1.default.info('Trial kontrol sonucu:', { trialResult });
+        logger_1.default.info('⏰ Abonelik cron çalışıyor: periyodik ödeme kontrol');
+        const recurringResult = yield SubscriptionService_1.default.checkRecurringPayments();
+        logger_1.default.info('Periyodik ödeme kontrol sonucu:', { recurringResult });
+        logger_1.default.info('⏰ Abonelik cron çalışıyor: expire işlemleri');
+        const expireResult = yield SubscriptionService_1.default.expireEndedSubscriptions();
+        logger_1.default.info('Expire işlemleri sonucu:', { expireResult });
+    }
+    catch (err) {
+        logger_1.default.error('Abonelik cron hatası:', { error: err });
+    }
+}));
 // MongoDB bağlantısı
 mongoose_1.default
     .connect(process.env.MONGODB_URI)
-    .then(() => console.log("✅ MongoDB bağlantısı başarılı"))
-    .catch((err) => console.log("❌ MongoDB bağlantı hatası:", err));
+    .then(() => {
+    console.log("✅ MongoDB bağlantısı başarılı");
+    logger_1.default.info("MongoDB bağlantısı başarılı");
+    (0, updateOnlineStatus_1.startOfflineUpdater)();
+})
+    .catch((err) => {
+    console.log("❌ MongoDB bağlantı hatası:", err);
+    logger_1.default.error("MongoDB bağlantı hatası", { error: err.message });
+});
 // Route'ları ekle
 app.use("/api/auth", authRoutes_1.default);
 app.use("/api/company", companyRoutes_1.default);
@@ -343,6 +562,7 @@ app.use("/api/product", productRoutes_1.default);
 app.use("/api/team-members", teamMemberRoutes_1.default);
 app.use("/api/upload", uploadRoutes_1.default);
 app.use("/api/ai", aiRoutes_1.default);
+app.use("/api/academic-ai", academicAiRoutes_1.default);
 app.use("/api", linkedInRoutes_1.default);
 app.use("/api/cards", cardRoutes_1.default);
 app.use("/api/payments", paymentRoutes_1.default);
@@ -352,6 +572,21 @@ app.use("/api/investments", investmentRoutes_1.default);
 app.use("/api", linkedinAuth_routes_1.default);
 app.use("/api", supabaseAuth_routes_1.default);
 app.use("/api/chat", chatRoutes_1.default);
+app.use("/api/billing-info", billingInfoRoutes_1.default);
+app.use("/api/complaints", complaintRoutes_1.default);
+app.use("/api/exchange-rates", exchangeRateRoutes_1.default);
+app.use("/api/coupons", couponRoutes_1.default);
+app.use("/api/click", clickTrackRoutes_1.default);
+app.use("/api/news", newsRoutes_1.default);
+app.use("/api/blog", blogRoutes_1.default);
+app.use("/api/panel-users", panelUserRoutes_1.default);
+app.use('/api/investment-news', investmentNewsRoutes_1.default);
+app.use("/api/hub", hubRoutes_1.default);
+app.use("/api/claim-requests", claimRequestRoutes_1.default);
+app.use('/api/heartbeat', heartbeat_1.default);
+app.use("/api/meta", metaConversionsRoutes_1.default);
+app.use("/api/modal-messages", modalMessageRoutes_1.default);
+app.use("/api/revenuecat", revenueCatRoutes_1.default);
 // Ana route
 app.get("/", (_req, res) => {
     res.json({ message: "🚀 AIKU API çalışıyor" });
@@ -362,4 +597,5 @@ const PORT = process.env.PORT || 3004;
 server.listen(PORT, () => {
     console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
     console.log("✅ Socket.IO sistemi aktif");
+    logger_1.default.info(`Sunucu başlatıldı`, { port: PORT, env: process.env.NODE_ENV });
 });

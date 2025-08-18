@@ -110,7 +110,7 @@ const productSchema = new mongoose_1.Schema({
         type: String,
         trim: true,
         match: [
-            /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,6}\.?)(\/[\w.-]*)*\/?$/,
+            /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,})(\.[a-z]{2,})?(\/[\w.-]*)*\/?$/i,
             'Please enter a valid URL',
         ],
     },
@@ -129,6 +129,10 @@ const productSchema = new mongoose_1.Schema({
             /^(https?:\/\/)?(www\.)?twitter\.com\/[A-Za-z0-9_]+\/?$/,
             'Please enter a valid Twitter URL',
         ],
+    },
+    isHighlighted: {
+        type: Boolean,
+        default: false,
     },
     companyId: {
         type: mongoose_1.default.Schema.Types.ObjectId,

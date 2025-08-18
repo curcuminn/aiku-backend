@@ -8,9 +8,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LinkedInController = void 0;
 const linkedInService_1 = require("../services/linkedInService");
+const logger_1 = __importDefault(require("../config/logger"));
 class LinkedInController {
     constructor() {
         this.linkedInService = new linkedInService_1.LinkedInService();
@@ -55,6 +59,7 @@ class LinkedInController {
             }
             catch (error) {
                 console.error("Callback error:", error);
+                logger_1.default.error(`LinkedIn callback hatası: ${error.message}`);
                 res.status(500).json({
                     success: false,
                     error: error.message,

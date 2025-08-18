@@ -152,6 +152,11 @@
     tar-fs "^3.0.8"
     yargs "^17.7.2"
 
+"@revenuecat/purchases-typescript-internal@^16.2.2":
+  version "16.2.2"
+  resolved "https://registry.yarnpkg.com/@revenuecat/purchases-typescript-internal/-/purchases-typescript-internal-16.2.2.tgz#2366e7c4375f81a1fac8869780dcb44654dfd228"
+  integrity sha512-+fLbgE6OUaHG0n98v/MO8faaR8asSIDvbOWH4LH58kbLcBxaeXr3LP46Sc2GdWhksYSCZMEXyMuvIA6aRFVd2g==
+
 "@socket.io/component-emitter@~3.1.0":
   version "3.1.2"
   resolved "https://registry.npmjs.org/@socket.io/component-emitter/-/component-emitter-3.1.2.tgz"

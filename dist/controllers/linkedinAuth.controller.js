@@ -24,11 +24,14 @@ class LinkedInAuthController {
     getLinkedInAuthURL(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const authURL = linkedinAuth_service_1.default.getLinkedInAuthURL();
+                const { platform } = req.query;
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Controller] URL isteği alındı. Platform:', platform);
+                const authURL = linkedinAuth_service_1.default.getLinkedInAuthURL(platform);
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Controller] URL başarıyla oluşturuldu');
                 res.status(200).json({ url: authURL });
             }
             catch (error) {
-                console.error("LinkedIn auth URL oluşturma hatası:", error);
+                console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Controller] URL oluşturma hatası:', error.message);
                 res.status(500).json({
                     error: error.message || "LinkedIn auth URL oluşturulurken bir hata oluştu",
                 });
@@ -42,43 +45,51 @@ class LinkedInAuthController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { code } = req.body;
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] İstek alındı. Code:', code);
                 if (!code) {
+                    console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Callback] Code parametresi eksik!');
                     res.status(400).json({ error: "Authorization code gereklidir" });
                     return;
                 }
                 // LinkedIn code'dan token al
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] Token alınıyor...');
                 const tokenData = yield linkedinAuth_service_1.default.getTokenFromCode(code);
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] Token alındı');
                 // Token ile kullanıcı bilgilerini al
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] Kullanıcı bilgileri alınıyor...');
                 const userInfo = yield linkedinAuth_service_1.default.getUserInfo(tokenData.access_token);
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] Kullanıcı bilgileri alındı');
                 // Kullanıcıyı Supabase'e kaydet/güncelle
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] Supabase işlemleri başlıyor...');
                 const userData = yield linkedinAuth_service_1.default.signInWithLinkedIn(userInfo);
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] Supabase işlemleri tamamlandı');
                 // MongoDB'de kullanıcıyı ara veya oluştur
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] MongoDB\'de kullanıcı aranıyor...');
                 let mongoUser = yield User_1.User.findOne({ email: userInfo.email });
                 if (!mongoUser) {
                     // Kullanıcı yoksa MongoDB'de oluştur
-                    console.log("MongoDB'de yeni kullanıcı oluşturuluyor:", userInfo.email);
+                    console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] Yeni MongoDB kullanıcısı oluşturuluyor...');
                     mongoUser = new User_1.User({
                         firstName: userInfo.firstName,
                         lastName: userInfo.lastName,
                         email: userInfo.email,
-                        supabaseId: userData.id, // Supabase ID'sini kaydet
-                        linkedinId: userInfo.id, // LinkedIn ID'sini kaydet
+                        supabaseId: userData.id,
+                        linkedinId: userInfo.id,
                         authProvider: "linkedin",
-                        emailVerified: true, // LinkedIn kullanıcıları genellikle doğrulanmıştır
+                        emailVerified: true,
                         lastLogin: new Date(),
                         profilePhoto: userInfo.profilePicture || "",
-                        linkedin: `https://www.linkedin.com/in/${userInfo.id}/`, // LinkedIn URL'si
+                        linkedin: `https://www.linkedin.com/in/${userInfo.id}/`,
                     });
                     yield mongoUser.save();
-                    console.log("MongoDB'de yeni kullanıcı oluşturuldu:", mongoUser._id);
+                    console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] Yeni MongoDB kullanıcısı oluşturuldu');
                 }
                 else {
                     // Kullanıcı varsa bilgilerini güncelle
-                    console.log("MongoDB'de mevcut kullanıcı güncelleniyor:", mongoUser._id);
+                    console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] Mevcut MongoDB kullanıcısı güncelleniyor...');
                     mongoUser.supabaseId = userData.id;
                     mongoUser.linkedinId = userInfo.id;
                     mongoUser.lastLogin = new Date();
-                    // Eksik bilgileri varsa güncelle
                     if (!mongoUser.firstName)
                         mongoUser.firstName = userInfo.firstName;
                     if (!mongoUser.lastName)
@@ -88,16 +99,17 @@ class LinkedInAuthController {
                     if (userInfo.profilePicture && !mongoUser.profilePhoto)
                         mongoUser.profilePhoto = userInfo.profilePicture;
                     yield mongoUser.save();
-                    console.log("MongoDB'de kullanıcı güncellendi");
+                    console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] MongoDB kullanıcısı güncellendi');
                 }
-                // JWT token oluştur - MongoDB kullanıcı ID'sini kullan
+                // JWT token oluştur
+                console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Callback] JWT token oluşturuluyor...');
                 const jwtSecret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
                 const jwtExpire = process.env.JWT_EXPIRE || "24h";
-                // @ts-expect-error - expiresIn string olarak kabul ediliyor
                 const jwtOptions = { expiresIn: jwtExpire };
-                const token = jsonwebtoken_1.default.sign({ id: mongoUser._id.toString() }, // MongoDB ID kullan
-                jwtSecret, jwtOptions);
+                const token = jsonwebtoken_1.default.sign({ id: mongoUser._id.toString() }, jwtSecret, jwtOptions);
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] JWT token oluşturuldu');
                 // Frontend'e kullanıcı bilgilerini ve token'ı gönder
+                console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Callback] İşlem başarıyla tamamlandı');
                 res.status(200).json({
                     token,
                     user: {
@@ -111,7 +123,7 @@ class LinkedInAuthController {
                 });
             }
             catch (error) {
-                console.error("LinkedIn callback işleme hatası:", error);
+                console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Callback] HATA:', error.message);
                 res.status(500).json({
                     error: error.message || "LinkedIn callback işlenirken bir hata oluştu",
                 });

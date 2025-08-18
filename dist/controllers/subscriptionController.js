@@ -85,7 +85,7 @@ const getUserSubscription = (req, res) => __awaiter(void 0, void 0, void 0, func
 });
 exports.getUserSubscription = getUserSubscription;
 /**
- * Kullanıcının abonelik planını değiştirir
+ * Kullanıcının abonelik planını değiştirir (Web ve Mobil için)
  */
 const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -97,7 +97,7 @@ const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, f
                 message: "Oturum açmanız gerekiyor",
             });
         }
-        const { plan, period } = req.body;
+        const { plan, period, platform } = req.body;
         // Plan ve periyod kontrolü
         if (!plan || !["startup", "business", "investor"].includes(plan)) {
             return res.status(400).json({
@@ -111,12 +111,28 @@ const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, f
                 message: "Geçersiz abonelik periyodu",
             });
         }
+        // Platform kontrolü (web veya mobile)
+        if (platform && !["web", "mobile"].includes(platform)) {
+            return res.status(400).json({
+                success: false,
+                message: "Geçersiz platform",
+            });
+        }
         // Kullanıcıyı bul
         const user = yield User_1.User.findById(userId);
         if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "Kullanıcı bulunamadı",
+            });
+        }
+        // Mevcut ödeme yöntemi kontrolü
+        const currentPaymentMethod = user.paymentMethod || 'creditCard';
+        // Eğer kullanıcı IAP kullanıyorsa ve web'e geçmeye çalışıyorsa engelle
+        if (currentPaymentMethod === 'iap' && platform === 'web') {
+            return res.status(400).json({
+                success: false,
+                message: "IAP kullanıcıları web'e geçemez. Lütfen mobil uygulamadan iptal edin.",
             });
         }
         // Abonelik planlarını al
@@ -126,6 +142,13 @@ const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, f
         // Abonelik planını ve periyodunu güncelle
         user.subscriptionPlan = plan;
         user.subscriptionPeriod = period;
+        // Platform'a göre ödeme yöntemini güncelle
+        if (platform === 'mobile') {
+            user.paymentMethod = 'iap';
+        }
+        else if (platform === 'web') {
+            user.paymentMethod = 'creditCard';
+        }
         // Eğer startup planı seçilmişse ve kullanıcının ilk aboneliği ise free trial uygula
         if (plan === "startup") {
             const planPricing = subscriptionPlans.startup.pricing[period];
@@ -135,7 +158,7 @@ const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, f
                 planPricing.isFirstTimeOnly) {
                 user.subscriptionStatus = "trial";
                 const trialEndDate = new Date();
-                const trialPeriod = "trialPeriod" in planPricing ? planPricing.trialPeriod : 3;
+                const trialPeriod = "trialPeriod" in planPricing ? planPricing.trialPeriod : 6;
                 trialEndDate.setMonth(trialEndDate.getMonth() + trialPeriod);
                 user.trialEndsAt = trialEndDate;
                 user.nextPaymentDate = trialEndDate;
@@ -167,28 +190,34 @@ const changeSubscriptionPlan = (req, res) => __awaiter(void 0, void 0, void 0, f
         yield user.save();
         // Abonelik planı bilgilerini al
         // @ts-expect-error - Planlar any tipinde olduğundan indexleme hatası görmezden geliniyor
-        const planDetails = SubscriptionService_1.default.getSubscriptionPlans()[plan];
+        const selectedPlan = subscriptionPlans[plan];
+        const pricing = selectedPlan.pricing[period];
         res.status(200).json({
             success: true,
-            message: "Abonelik planı başarıyla değiştirildi",
-            data: {
-                subscriptionPlan: user.subscriptionPlan,
-                subscriptionPeriod: user.subscriptionPeriod,
-                subscriptionStatus: user.subscriptionStatus,
-                subscriptionAmount: user.subscriptionAmount,
-                subscriptionStartDate: user.subscriptionStartDate,
+            message: "Abonelik planı başarıyla güncellendi",
+            subscription: {
+                plan: user.subscriptionPlan,
+                period: user.subscriptionPeriod,
+                status: user.subscriptionStatus,
+                startDate: user.subscriptionStartDate,
                 trialEndsAt: user.trialEndsAt,
                 nextPaymentDate: user.nextPaymentDate,
-                planDetails: planDetails,
-                isSubscriptionActive: user.isSubscriptionActive,
-                isFirstTimeSubscription: isFirstTimeSubscription,
+                paymentMethod: user.paymentMethod,
+                platform: platform
             },
+            planDetails: {
+                name: selectedPlan.name,
+                description: selectedPlan.description,
+                features: selectedPlan.features,
+                pricing: pricing
+            }
         });
     }
     catch (error) {
+        console.error("Abonelik planı değiştirme hatası:", error);
         res.status(500).json({
             success: false,
-            message: "Abonelik planı değiştirilirken bir hata oluştu",
+            message: "Abonelik planı değiştirilemedi",
             error: error.message,
         });
     }

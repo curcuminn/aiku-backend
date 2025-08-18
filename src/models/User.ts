@@ -278,7 +278,7 @@ const userSchema = new Schema<IUser>({
   },
   paymentMethod: {
     type: String,
-    enum: ['creditCard', 'bankTransfer', 'other'],
+    enum: ['creditCard', 'bankTransfer', 'iap', 'other'],
     default: 'creditCard'
   },
   savedCardId: {
@@ -296,6 +296,8 @@ const userSchema = new Schema<IUser>({
       {
         amount: Number,
         date: Date,
+        platform: String, // 'APP_STORE', 'PLAY_STORE', 'WEB'
+        iapTransactionId: String, // IAP transaction ID'si
         status: String,
         transactionId: String,
         description: String,

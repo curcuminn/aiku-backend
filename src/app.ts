@@ -49,6 +49,7 @@ import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
 import academicAiRoutes from "./routes/academicAiRoutes";
+import revenueCatRoutes from "./routes/revenueCatRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -651,6 +652,7 @@ app.use("/api/claim-requests", claimRequestRoutes);
 app.use('/api/heartbeat', heartbeatRouter);
 app.use("/api/meta", metaConversionsRoutes);
 app.use("/api/modal-messages", modalMessageRoutes);
+app.use("/api/revenuecat", revenueCatRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

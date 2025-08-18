@@ -14,6 +14,12 @@ const router = (0, express_1.Router)();
 router.get('/all', optionalAuth_1.optionalAuth, companyController_1.getAllCompanies);
 // Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', auth_1.protect, companyController_1.getCompaniesForUser);
+// Kullanıcının e-posta domain’ine uygun, user’a ait olmayan şirketleri getir
+// Örnek: GET /api/company/match-domain?domain=example.com
+router.get('/match-domain', auth_1.protect, companyController_1.matchCompaniesByDomain);
+// Şirketi “claim” etme (sahipliğini devralma)
+// POST /api/company/:id/claim
+router.post('/:id/claim', auth_1.protect, companyController_1.claimCompany);
 // Şirket oluşturma rotası (örn: POST /api/company)
 router.post('/', auth_1.protect, [
     (0, express_validator_1.check)('companyName', 'Şirket adı zorunludur').not().isEmpty(),
@@ -21,8 +27,8 @@ router.post('/', auth_1.protect, [
     (0, express_validator_1.check)('businessModel', 'İş modeli zorunludur').not().isEmpty(),
     (0, express_validator_1.check)('companySector', 'Şirket sektörü zorunludur').not().isEmpty(),
     (0, express_validator_1.check)('companySize', 'Şirket büyüklüğü zorunludur').not().isEmpty(),
-    (0, express_validator_1.check)('companyEmail', 'Lütfen geçerli bir email adresi giriniz').isEmail(),
-    (0, express_validator_1.check)('companyPhone', 'Şirket telefonu zorunludur').not().isEmpty(),
+    // check('companyEmail', 'Lütfen geçerli bir email adresi giriniz').isEmail(),
+    // check('companyPhone', 'Şirket telefonu zorunludur').not().isEmpty(),
     (0, express_validator_1.check)('companyInfo', 'Şirket bilgisi zorunludur').not().isEmpty(),
     (0, express_validator_1.check)('companyWebsite', 'Şirket web sitesi zorunludur').not().isEmpty(),
     // check('companyAddress', 'Şirket adresi zorunludur').not().isEmpty(),

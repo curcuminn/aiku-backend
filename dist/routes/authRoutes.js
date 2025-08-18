@@ -8,6 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const express_validator_1 = require("express-validator");
@@ -16,6 +19,7 @@ const auth_1 = require("../middleware/auth");
 const linkedInService_1 = require("../services/linkedInService");
 const supabase_1 = require("../config/supabase");
 const googleService_1 = require("../services/googleService");
+const logger_1 = __importDefault(require("../config/logger"));
 const router = (0, express_1.Router)();
 // Kayıt rotası
 router.post("/register", [
@@ -33,8 +37,23 @@ router.post("/login", [
 router.get("/currentUser", auth_1.optionalSupabaseToken, authController_1.getCurrentUser);
 // Kullanıcı bilgilerini güncelleme rotası
 router.put("/updateUser", auth_1.optionalSupabaseToken, authController_1.updateUser);
+router.put("/change-password", auth_1.protect, [
+    (0, express_validator_1.check)("currentPassword", "Current password is required").notEmpty(),
+    (0, express_validator_1.check)("newPassword", "New password must be at least 6 characters").isLength({ min: 6 }),
+    (0, express_validator_1.check)("confirmPassword", "Passwords do not match")
+        .custom((value, { req }) => value === req.body.newPassword),
+], authController_1.changePassword);
 // Kullanıcı id'si ile bilgilerini alma rotası
 router.get("/user/:id", auth_1.optionalSupabaseToken, authController_1.getUserById);
+router.put('/updateUserById/:id', auth_1.protect, authController_1.updateUserById);
+router.post("/email/change/request", auth_1.protect, [
+    (0, express_validator_1.check)("newEmail", "Please enter a valid email").isEmail().normalizeEmail()
+], authController_1.requestEmailChange);
+router.post("/email/change/confirm", [
+    (0, express_validator_1.check)("code", "Verification code is required").isLength({ min: 6, max: 6 })
+], authController_1.confirmEmailChange);
+// **Yeni Eklenti: Tüm kullanıcıları çekme rotası (Sadece admin erişimi)**
+router.get("/users", auth_1.protect, authController_1.getAllUsers);
 // Abonelik durumunu kontrol et ve düzelt
 router.get("/fix-subscription", auth_1.protect, authController_1.fixSubscription);
 // Yeni abonelik oluşturma veya güncelleme
@@ -82,6 +101,7 @@ router.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
     catch (error) {
         console.error('Google auth error:', error);
+        logger_1.default.error('Google auth error:', error);
         res.redirect(`${process.env.CLIENT_URL}/auth/login?error=auth-failed`);
     }
 }));
@@ -102,6 +122,7 @@ router.get("/auth/callback", (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
     catch (error) {
         console.error("Google callback error:", error);
+        logger_1.default.error("Google callback error:", error);
         res.redirect(`${process.env.CLIENT_URL}/auth/login?error=callback-failed`);
     }
 }));
@@ -112,12 +133,13 @@ router.post("/google/login", (req, res) => __awaiter(void 0, void 0, void 0, fun
             body: req.body,
             headers: req.headers
         });
-        const { accessToken } = req.body;
-        if (!accessToken) {
-            console.log("Token bulunamadı:", req.body);
+        const { idToken, accessToken } = req.body;
+        if (!idToken && !accessToken) {
+            console.log("Google auth login token bulunamadı:", req.body);
+            logger_1.default.error("Google auth login Token bulunamadı:", req.body);
             return res.status(400).json({
                 success: false,
-                error: "Access token gereklidir",
+                error: "idToken veya accessToken gereklidir",
                 details: "Kimlik doğrulama başarısız",
                 errorCode: 400
             });
@@ -125,6 +147,7 @@ router.post("/google/login", (req, res) => __awaiter(void 0, void 0, void 0, fun
         const googleService = new googleService_1.GoogleService();
         const authResult = yield googleService.handleAuth({
             user: {
+                id_token: idToken,
                 access_token: accessToken
             }
         });
@@ -136,6 +159,7 @@ router.post("/google/login", (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
     catch (error) {
         console.error("Google login error:", error);
+        logger_1.default.error("Google login error:", error);
         res.status(500).json({
             success: false,
             error: error.message,
@@ -146,6 +170,10 @@ router.post("/google/login", (req, res) => __awaiter(void 0, void 0, void 0, fun
 }));
 // Oturum kapatma rotası
 router.post("/logout", auth_1.protect, authController_1.logout);
+// Self-delete
+router.delete("/delete-account", auth_1.protect, authController_1.deleteCurrentUser);
+// Admin: delete any user
+router.delete("/users/:id", auth_1.protect, authController_1.deleteUserById);
 // LinkedIn Routes
 router.get("/linkedin", (req, res) => {
     const linkedInService = new linkedInService_1.LinkedInService();
@@ -166,7 +194,13 @@ router.post("/linkedin", (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
     catch (error) {
         console.error("LinkedIn auth error:", error);
+        logger_1.default.error("LinkedIn auth error:", error);
         res.status(500).json({ error: error.message });
     }
 }));
+// E-posta doğrulama rotaları
+router.get("/verify-email/:token", authController_1.verifyEmail);
+router.post("/resend-verification", [
+    (0, express_validator_1.check)("email", "Please enter a valid email address.").isEmail(),
+], authController_1.resendVerificationEmail);
 exports.default = router;

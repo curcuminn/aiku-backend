@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const metaConversionsController_1 = require("../controllers/metaConversionsController");
+const router = (0, express_1.Router)();
+router.post("/kvkk-consent", metaConversionsController_1.sendKvkkConsent);
+router.post("/chat-started", metaConversionsController_1.sendChatStarted);
+router.post("/whatsapp-click", metaConversionsController_1.sendWhatsAppClick);
+router.post("/event", metaConversionsController_1.sendGeneric);
+exports.default = router;

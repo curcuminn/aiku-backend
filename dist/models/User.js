@@ -65,7 +65,7 @@ const userSchema = new mongoose_1.Schema({
         unique: true,
         trim: true,
         lowercase: true,
-        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Lütfen geçerli bir email adresi giriniz']
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.[A-Za-z]{2,})+$/, 'Lütfen geçerli bir email adresi giriniz']
     },
     password: {
         type: String,
@@ -75,7 +75,21 @@ const userSchema = new mongoose_1.Schema({
         minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
         select: false
     },
+    accountStatus: {
+        type: String,
+        enum: ['active', 'deleted', 'deactivated'],
+        default: 'active',
+        required: true
+    },
     phone: {
+        type: String,
+        trim: true
+    },
+    countryCode: {
+        type: String,
+        trim: true,
+    },
+    localPhone: {
         type: String,
         trim: true
     },
@@ -138,6 +152,34 @@ const userSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false
     },
+    emailVerificationToken: {
+        type: String,
+        select: false
+    },
+    emailVerificationExpires: {
+        type: Date,
+        select: false
+    },
+    newEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        select: false,
+        match: [
+            /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/,
+            'Please enter a valid email'
+        ]
+        // unique: true,
+        // sparse: true
+    },
+    emailChangeToken: {
+        type: String,
+        select: false
+    },
+    emailChangeExpires: {
+        type: Date,
+        select: false
+    },
     locale: {
         country: { type: String },
         language: { type: String }
@@ -198,7 +240,7 @@ const userSchema = new mongoose_1.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['creditCard', 'bankTransfer', 'other'],
+        enum: ['creditCard', 'bankTransfer', 'iap', 'other'],
         default: 'creditCard'
     },
     savedCardId: {
@@ -216,6 +258,8 @@ const userSchema = new mongoose_1.Schema({
             {
                 amount: Number,
                 date: Date,
+                platform: String, // 'APP_STORE', 'PLAY_STORE', 'WEB'
+                iapTransactionId: String, // IAP transaction ID'si
                 status: String,
                 transactionId: String,
                 description: String,
@@ -231,6 +275,13 @@ const userSchema = new mongoose_1.Schema({
                 period: {
                     type: String,
                     enum: ['monthly', 'yearly']
+                },
+                cardDetails: {
+                    cardType: String,
+                    cardMaskedNumber: String,
+                    cardHolderName: String,
+                    expireMonth: String,
+                    expireYear: String
                 }
             }
         ],
@@ -246,16 +297,30 @@ const userSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false
     },
+    isOnline: {
+        type: Boolean,
+        default: false
+    },
+    lastSeen: {
+        type: Date,
+        default: Date.now
+    },
+    acceptChatNotification: {
+        type: Boolean,
+        default: true // kullanıcı varsayılan olarak chat mail bildirimlerini kabul etsin
+    },
     role: {
         type: String,
         enum: ['user', 'admin', 'editor'],
         default: 'user'
-    }
+    },
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
+userSchema.index({ emailChangeToken: 1 }, { sparse: true });
+userSchema.index({ emailChangeExpires: 1 }, { expireAfterSeconds: 0 });
 userSchema.pre('save', function (next) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!this.isModified('password') || !this.password) {
@@ -266,15 +331,26 @@ userSchema.pre('save', function (next) {
         next();
     });
 });
-// Abonelik planı startup olarak ayarlandığında 3 aylık deneme süresi tanımlanır
+// Abonelik planı startup olarak ayarlandığında 6 aylık deneme süresi tanımlanır
 userSchema.pre('save', function (next) {
-    // Abonelik planı startup olarak değiştirilmişse ve durumu trial değilse
-    if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup' && this.subscriptionStatus !== 'trial') {
-        this.subscriptionStatus = 'trial';
-        const trialEndDate = new Date();
-        trialEndDate.setMonth(trialEndDate.getMonth() + 3);
-        this.trialEndsAt = trialEndDate;
-        this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
+    // Abonelik planı değiştiyse ve plan startup ise
+    if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup') {
+        // İlk abonelik olup olmadığını kontrol et (periyod fark etmeksizin)
+        const isFirstSubscription = !this.paymentHistory || this.paymentHistory.length === 0;
+        // Sadece ilk abonelik ise trial süresi ver (aylık veya yıllık)
+        if (isFirstSubscription) {
+            this.subscriptionStatus = 'trial';
+            const trialEndDate = new Date();
+            trialEndDate.setMonth(trialEndDate.getMonth() + 6);
+            this.trialEndsAt = trialEndDate;
+            this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
+        }
+        else if (this.subscriptionStatus !== 'active') {
+            // İlk abonelik değilse ve aktif değilse, aktif olarak işaretle
+            this.subscriptionStatus = 'active';
+            // Trial süresini kaldır
+            this.trialEndsAt = undefined;
+        }
     }
     next();
 });
@@ -347,7 +423,8 @@ userSchema.methods.checkAutoRenewal = function () {
                             description: 'Otomatik abonelik yenileme',
                             type: 'subscription',
                             plan: this.subscriptionPlan,
-                            period: this.subscriptionPeriod
+                            period: this.subscriptionPeriod,
+                            cardDetails: paymentResult.cardDetails
                         });
                         this.lastPaymentDate = new Date();
                         yield this.save();
@@ -355,6 +432,17 @@ userSchema.methods.checkAutoRenewal = function () {
                     }
                     else {
                         // Ödeme başarısız ise durumu güncelle
+                        if (!this.paymentHistory)
+                            this.paymentHistory = [];
+                        this.paymentHistory.push({
+                            amount: this.subscriptionAmount || 0,
+                            date: new Date(),
+                            status: 'failed',
+                            description: 'Otomatik abonelik yenileme başarısız',
+                            type: 'subscription',
+                            plan: this.subscriptionPlan,
+                            period: this.subscriptionPeriod
+                        });
                         this.subscriptionStatus = 'expired';
                         yield this.save();
                         return false;
@@ -362,6 +450,18 @@ userSchema.methods.checkAutoRenewal = function () {
                 }
                 catch (error) {
                     console.error('Otomatik ödeme işleminde hata:', error);
+                    if (!this.paymentHistory)
+                        this.paymentHistory = [];
+                    this.paymentHistory.push({
+                        amount: this.subscriptionAmount || 0,
+                        date: new Date(),
+                        status: 'failed',
+                        description: 'Otomatik abonelik yenileme hata nedeniyle başarısız',
+                        type: 'subscription',
+                        plan: this.subscriptionPlan,
+                        period: this.subscriptionPeriod
+                    });
+                    yield this.save();
                     return false;
                 }
             }
@@ -402,9 +502,17 @@ userSchema.methods.processPayment = function () {
                 is3D: false,
                 userId: this._id.toString()
             });
+            const cardDetails = {
+                cardType: savedCard.cardType,
+                cardMaskedNumber: savedCard.cardMaskedNumber,
+                cardHolderName: savedCard.cardHolderName,
+                expireMonth: savedCard.cardExpireMonth,
+                expireYear: savedCard.cardExpireYear
+            };
             return {
                 success: true,
-                transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString()
+                transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString(),
+                cardDetails
             };
         }
         catch (error) {

@@ -19,6 +19,7 @@ const geminiService_1 = require("./geminiService");
 const dotenv_1 = __importDefault(require("dotenv"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = require("../models/User");
+const logger_1 = __importDefault(require("../config/logger"));
 dotenv_1.default.config();
 class LinkedInService {
     constructor() {
@@ -45,7 +46,7 @@ class LinkedInService {
     }
     getAccessToken(code) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c;
+            var _a, _b, _c, _d, _e;
             try {
                 console.log("Getting access token with code:", code);
                 console.log("Using client ID:", this.clientId);
@@ -64,13 +65,14 @@ class LinkedInService {
             }
             catch (error) {
                 console.error("LinkedIn access token error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
-                throw new Error(`LinkedIn access token alınamadı: ${((_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error_description) || error.message}`);
+                logger_1.default.error(`LinkedIn access token alınamadı: ${((_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error_description) || error.message}`);
+                throw new Error(`LinkedIn access token alınamadı: ${((_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.error_description) || error.message}`);
             }
         });
     }
     getProfile(accessToken) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c;
+            var _a, _b, _c, _d, _e;
             try {
                 console.log("Getting user profile with access token");
                 const userInfoResponse = yield axios_1.default.get("https://api.linkedin.com/v2/userinfo", {
@@ -81,7 +83,8 @@ class LinkedInService {
             }
             catch (error) {
                 console.error("LinkedIn profile error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
-                throw new Error(`LinkedIn profil bilgileri alınamadı: ${((_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error_description) || error.message}`);
+                logger_1.default.error(`LinkedIn profil bilgileri alınamadı: ${((_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error_description) || error.message}`);
+                throw new Error(`LinkedIn profil bilgileri alınamadı: ${((_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.error_description) || error.message}`);
             }
         });
     }
@@ -91,7 +94,7 @@ class LinkedInService {
             email: userInfo.email,
             picture: userInfo.picture,
             locale: userInfo.locale,
-            emailVerified: userInfo.email_verified,
+            emailVerified: true,
             linkedinUrl: `https://www.linkedin.com/in/${userInfo.sub}/`,
         };
     }
@@ -186,6 +189,7 @@ class LinkedInService {
             }
             catch (error) {
                 console.error("LinkedIn auth error:", error);
+                logger_1.default.error(`LinkedIn ile giriş işlemi başarısız: ${error.message}`);
                 throw new Error("LinkedIn ile giriş işlemi başarısız: " + error.message);
             }
         });
@@ -193,7 +197,7 @@ class LinkedInService {
     // LinkedIn profil bilgilerini gerekirse doğrudan alma
     getLinkedInUserInfo(accessToken) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c;
             try {
                 const response = yield axios_1.default.get('https://api.linkedin.com/v2/userinfo', {
                     headers: { Authorization: `Bearer ${accessToken}` }
@@ -202,6 +206,7 @@ class LinkedInService {
             }
             catch (error) {
                 console.error("LinkedIn userinfo error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
+                logger_1.default.error(`LinkedIn kullanıcı bilgileri alınamadı: ${((_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error_description) || error.message}`);
                 throw new Error("LinkedIn kullanıcı bilgileri alınamadı");
             }
         });

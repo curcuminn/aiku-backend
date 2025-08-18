@@ -12,11 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadCompanyVideo = exports.deleteCompany = exports.updateCompany = exports.getCompaniesForUser = exports.getCompany = exports.createCompany = exports.getAllCompanies = void 0;
+exports.claimCompany = exports.matchCompaniesByDomain = exports.uploadCompanyVideo = exports.deleteCompany = exports.updateCompany = exports.getCompaniesForUser = exports.getCompany = exports.createCompany = exports.getAllCompanies = void 0;
 const express_validator_1 = require("express-validator");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Company_1 = require("../models/Company");
 const mongoose_1 = __importDefault(require("mongoose"));
+const User_1 = require("../models/User");
 // Tüm şirketleri getirme
 const getAllCompanies = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -26,8 +27,15 @@ const getAllCompanies = (req, res) => __awaiter(void 0, void 0, void 0, function
         //   return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
         // }
         // const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-        const companies = yield Company_1.Company.find();
-        const companiesResponse = companies.map((company) => ({
+        const companies = yield Company_1.Company.find()
+            .populate({
+            path: "user",
+            select: "accountStatus",
+            match: { accountStatus: "active" }
+        });
+        // populate sonucu user null gelenleri filtrele
+        const activeCompanies = companies.filter(c => c.user);
+        const companiesResponse = activeCompanies.map(company => ({
             id: company._id,
             companyName: company.companyName,
             companyLogo: company.companyLogo,
@@ -37,8 +45,11 @@ const getAllCompanies = (req, res) => __awaiter(void 0, void 0, void 0, function
             companySector: company.companySector,
             companySize: company.companySize,
             businessScale: company.businessScale,
+            fundSize: company.fundSize,
             companyEmail: company.companyEmail,
             companyPhone: company.companyPhone,
+            countryCode: company.countryCode,
+            localPhone: company.localPhone,
             companyInfo: company.companyInfo,
             detailedDescription: company.detailedDescription,
             companyWebsite: company.companyWebsite,
@@ -48,7 +59,12 @@ const getAllCompanies = (req, res) => __awaiter(void 0, void 0, void 0, function
             companyInstagram: company.companyInstagram,
             interestedSectors: company.interestedSectors,
             isIncorporated: company.isIncorporated,
-            user: company.user.toString(),
+            isHighlighted: company.isHighlighted,
+            acceptMessages: company.acceptMessages,
+            numberOfInvestments: company.numberOfInvestments,
+            numberOfExits: company.numberOfExits,
+            user: company.user._id.toString(),
+            connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
             createdAt: company.createdAt,
         }));
         res.status(200).json({ success: true, companies: companiesResponse });
@@ -83,7 +99,7 @@ const createCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         const userId = decoded.id;
-        const { companyName, companyLogo, companyType, openForInvestments, businessModel, companySector, companySize, businessScale, companyEmail, companyPhone, companyInfo, detailedDescription, companyWebsite, companyAddress, companyLinkedIn, companyTwitter, companyInstagram, interestedSectors, isIncorporated, } = req.body;
+        const { companyName, companyLogo, companyType, openForInvestments, businessModel, companySector, companySize, businessScale, fundSize, companyEmail, companyPhone, countryCode, localPhone, companyInfo, detailedDescription, companyWebsite, companyAddress, companyLinkedIn, companyTwitter, companyInstagram, interestedSectors, isIncorporated, isHighlighted, acceptMessages, numberOfInvestments, numberOfExits, connectedHub, } = req.body;
         const company = yield Company_1.Company.create({
             companyName,
             companyLogo,
@@ -93,8 +109,11 @@ const createCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companySector,
             companySize,
             businessScale,
+            fundSize,
             companyEmail,
             companyPhone,
+            countryCode,
+            localPhone,
             companyInfo,
             detailedDescription,
             companyWebsite,
@@ -104,7 +123,12 @@ const createCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companyInstagram,
             interestedSectors,
             isIncorporated,
+            isHighlighted,
+            acceptMessages,
+            numberOfInvestments,
+            numberOfExits,
             user: userId,
+            connectedHub: connectedHub || null,
         });
         const companyResponse = {
             id: company._id,
@@ -116,8 +140,11 @@ const createCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companySector: company.companySector,
             companySize: company.companySize,
             businessScale: company.businessScale,
+            fundSize: company.fundSize,
             companyEmail: company.companyEmail,
             companyPhone: company.companyPhone,
+            countryCode: company.countryCode,
+            localPhone: company.localPhone,
             companyInfo: company.companyInfo,
             detailedDescription: company.detailedDescription,
             companyWebsite: company.companyWebsite,
@@ -127,7 +154,12 @@ const createCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companyInstagram: company.companyInstagram,
             interestedSectors: company.interestedSectors,
             isIncorporated: company.isIncorporated,
+            isHighlighted: company.isHighlighted,
+            acceptMessages: company.acceptMessages,
+            numberOfInvestments: company.numberOfInvestments,
+            numberOfExits: company.numberOfExits,
             user: company.user.toString(),
+            connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
             createdAt: company.createdAt,
         };
         res.status(201).json({ success: true, company: companyResponse });
@@ -159,8 +191,11 @@ const getCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             companySector: company.companySector,
             companySize: company.companySize,
             businessScale: company.businessScale,
+            fundSize: company.fundSize,
             companyEmail: company.companyEmail,
             companyPhone: company.companyPhone,
+            countryCode: company.countryCode,
+            localPhone: company.localPhone,
             companyInfo: company.companyInfo,
             detailedDescription: company.detailedDescription,
             companyWebsite: company.companyWebsite,
@@ -170,7 +205,12 @@ const getCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             companyInstagram: company.companyInstagram,
             interestedSectors: company.interestedSectors,
             isIncorporated: company.isIncorporated,
+            isHighlighted: company.isHighlighted,
+            acceptMessages: company.acceptMessages,
+            numberOfInvestments: company.numberOfInvestments,
+            numberOfExits: company.numberOfExits,
             user: company.user.toString(),
+            connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
             createdAt: company.createdAt,
         };
         res.status(200).json({ success: true, company: companyResponse });
@@ -207,8 +247,11 @@ const getCompaniesForUser = (req, res) => __awaiter(void 0, void 0, void 0, func
             companySector: company.companySector,
             companySize: company.companySize,
             businessScale: company.businessScale,
+            fundSize: company.fundSize,
             companyEmail: company.companyEmail,
             companyPhone: company.companyPhone,
+            countryCode: company.countryCode,
+            localPhone: company.localPhone,
             companyInfo: company.companyInfo,
             detailedDescription: company.detailedDescription,
             companyWebsite: company.companyWebsite,
@@ -218,7 +261,14 @@ const getCompaniesForUser = (req, res) => __awaiter(void 0, void 0, void 0, func
             companyInstagram: company.companyInstagram,
             interestedSectors: company.interestedSectors,
             isIncorporated: company.isIncorporated,
+            isHighlighted: company.isHighlighted,
+            acceptMessages: company.acceptMessages,
+            numberOfInvestments: company.numberOfInvestments,
+            numberOfExits: company.numberOfExits,
             user: company.user.toString(),
+            connectedHub: company.connectedHub
+                ? company.connectedHub.toString()
+                : null,
             createdAt: company.createdAt,
         }));
         res.status(200).json({ success: true, companies: companiesResponse });
@@ -246,6 +296,7 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         const userId = decoded.id;
+        const userRole = decoded.role;
         const { id } = req.params;
         let company = yield Company_1.Company.findById(id);
         if (!company) {
@@ -253,12 +304,12 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 .status(404)
                 .json({ success: false, message: "Şirket bulunamadı" });
         }
-        if (company.user.toString() !== userId) {
+        if (company.user.toString() !== userId && userRole !== 'admin') {
             return res
                 .status(403)
                 .json({ success: false, message: "Bu şirket üzerinde yetkiniz yok" });
         }
-        const { companyName, companyLogo, companyType, openForInvestments, businessModel, companySector, companySize, businessScale, companyEmail, companyPhone, companyInfo, detailedDescription, companyWebsite, companyAddress, companyLinkedIn, companyTwitter, companyInstagram, interestedSectors, isIncorporated, } = req.body;
+        const { companyName, companyLogo, companyType, openForInvestments, businessModel, companySector, companySize, businessScale, fundSize, companyEmail, companyPhone, countryCode, localPhone, companyInfo, detailedDescription, companyWebsite, companyAddress, companyLinkedIn, companyTwitter, companyInstagram, interestedSectors, isIncorporated, isHighlighted, acceptMessages, numberOfInvestments, numberOfExits, connectedHub, } = req.body;
         if (companyName)
             company.companyName = companyName;
         if (companyLogo)
@@ -275,10 +326,16 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             company.companySize = companySize;
         if (businessScale)
             company.businessScale = businessScale;
+        if (fundSize)
+            company.fundSize = fundSize;
         if (companyEmail)
             company.companyEmail = companyEmail;
         if (companyPhone)
             company.companyPhone = companyPhone;
+        if (countryCode)
+            company.countryCode = countryCode;
+        if (localPhone)
+            company.localPhone = localPhone;
         if (companyInfo)
             company.companyInfo = companyInfo;
         if (detailedDescription)
@@ -297,6 +354,17 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             company.interestedSectors = interestedSectors;
         if (isIncorporated !== undefined)
             company.isIncorporated = isIncorporated;
+        if (isHighlighted !== undefined)
+            company.isHighlighted = isHighlighted;
+        if (acceptMessages !== undefined)
+            company.acceptMessages = acceptMessages;
+        if (numberOfInvestments !== undefined)
+            company.numberOfInvestments = numberOfInvestments;
+        if (numberOfExits !== undefined)
+            company.numberOfExits = numberOfExits;
+        if (connectedHub !== undefined) {
+            company.connectedHub = connectedHub;
+        }
         yield company.save();
         const companyResponse = {
             id: company._id,
@@ -308,8 +376,11 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companySector: company.companySector,
             companySize: company.companySize,
             businessScale: company.businessScale,
+            fundSize: company.fundSize,
             companyEmail: company.companyEmail,
             companyPhone: company.companyPhone,
+            countryCode: company.countryCode,
+            localPhone: company.localPhone,
             companyInfo: company.companyInfo,
             detailedDescription: company.detailedDescription,
             companyWebsite: company.companyWebsite,
@@ -319,7 +390,14 @@ const updateCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             companyInstagram: company.companyInstagram,
             interestedSectors: company.interestedSectors,
             isIncorporated: company.isIncorporated,
+            isHighlighted: company.isHighlighted,
+            acceptMessages: company.acceptMessages,
+            numberOfInvestments: company.numberOfInvestments,
+            numberOfExits: company.numberOfExits,
             user: company.user.toString(),
+            connectedHub: company.connectedHub
+                ? company.connectedHub.toString()
+                : null,
             createdAt: company.createdAt,
         };
         res.status(200).json({ success: true, company: companyResponse });
@@ -360,7 +438,7 @@ const deleteCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 .json({ success: false, message: "Bu şirket üzerinde yetkiniz yok" });
         }
         // @ts-expect-error - Mongoose'un yeni sürümlerinde remove metodu yerine deleteOne kullanılmalı
-        yield company.remove();
+        yield company.deleteOne();
         res
             .status(200)
             .json({ success: true, message: "Şirket başarıyla silindi" });
@@ -407,3 +485,93 @@ const uploadCompanyVideo = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.uploadCompanyVideo = uploadCompanyVideo;
+// Kullanıcının e-posta domain’ine göre, hâlihazırda o kullanıcıya ait olmayan şirketleri getir
+const matchCompaniesByDomain = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        // 1) Domain query parametresini al ve doğrula
+        const rawDomain = req.query.domain;
+        if (!rawDomain || typeof rawDomain !== 'string') {
+            return res
+                .status(400)
+                .json({ success: false, message: 'domain query parametresi zorunlu' });
+        }
+        const domain = rawDomain.trim().toLowerCase();
+        // 2) Token'dan kullanıcıyı çöz (aynı create/update’de yaptığınız gibi)
+        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        if (!token) {
+            return res
+                .status(401)
+                .json({ success: false, message: 'Yetkilendirme başarısız, token yok' });
+        }
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+        // 3) companyEmail alanı “@domain” ile biten, ama user !== userId olanları bul
+        const companies = yield Company_1.Company.find({
+            companyEmail: { $regex: new RegExp(`@${domain}$`, 'i') },
+            user: { $ne: userId }
+        })
+            .select('companyName companyEmail companyLogo user');
+        // 4) Döndür
+        res.status(200).json({ success: true, companies });
+    }
+    catch (err) {
+        res
+            .status(500)
+            .json({ success: false, message: 'Sunucu hatası', error: err.message });
+    }
+});
+exports.matchCompaniesByDomain = matchCompaniesByDomain;
+const claimCompany = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        const { id } = req.params;
+        // 1) ID geçerli mi?
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid company ID" });
+        }
+        // 2) Şirketi al
+        const company = yield Company_1.Company.findById(id);
+        if (!company) {
+            return res.status(404).json({ success: false, message: "Company not found" });
+        }
+        // 3) Zaten siz misiniz?
+        const token = (_a = req.header("Authorization")) === null || _a === void 0 ? void 0 : _a.replace("Bearer ", "");
+        if (!token) {
+            return res.status(401).json({ success: false, message: "Token missing" });
+        }
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+        if (company.user.toString() === userId) {
+            return res
+                .status(400)
+                .json({ success: false, message: "You already own this company" });
+        }
+        // 4) Kullanıcıyı çek (sadece email lazım)
+        const user = yield User_1.User.findById(userId).select("email");
+        if (!(user === null || user === void 0 ? void 0 : user.email)) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        // 5) Domain’leri karşılaştır
+        const userDomain = user.email.split("@")[1].toLowerCase();
+        const companyDomain = (_b = company.companyEmail.split("@")[1]) === null || _b === void 0 ? void 0 : _b.toLowerCase();
+        if (userDomain !== companyDomain) {
+            return res
+                .status(403)
+                .json({ success: false, message: "Email domain does not match" });
+        }
+        // 6) Atama ve kaydet
+        company.user = userId;
+        yield company.save();
+        res
+            .status(200)
+            .json({ success: true, message: "Company successfully claimed", company });
+    }
+    catch (err) {
+        console.error("claimCompany error:", err);
+        res
+            .status(500)
+            .json({ success: false, message: "Server error", error: err.message });
+    }
+});
+exports.claimCompany = claimCompany;

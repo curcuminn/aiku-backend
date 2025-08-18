@@ -17,6 +17,8 @@ const User_1 = require("../models/User");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const axios_1 = __importDefault(require("axios"));
+const logger_1 = __importDefault(require("../config/logger"));
+const googleAuth_1 = require("../config/googleAuth");
 dotenv_1.default.config();
 class GoogleService {
     handleAuth(data) {
@@ -24,59 +26,60 @@ class GoogleService {
             var _a;
             try {
                 console.log("GoogleService.handleAuth başladı:", data);
-                // Google'dan kullanıcı bilgilerini al
-                const googleUserInfo = yield this.getGoogleUserInfo(data.user.access_token);
-                console.log("Google kullanıcı bilgileri alındı:", googleUserInfo);
-                // MongoDB'de kullanıcıyı ara veya oluştur
-                let user = yield User_1.User.findOne({ email: googleUserInfo.email });
-                const userData = {
-                    firstName: googleUserInfo.given_name || ((_a = googleUserInfo.email) === null || _a === void 0 ? void 0 : _a.split("@")[0]),
-                    lastName: googleUserInfo.family_name || "",
-                    email: googleUserInfo.email,
-                    emailVerified: googleUserInfo.email_verified,
-                    authProvider: "google",
-                    lastLogin: new Date(),
-                    googleId: googleUserInfo.sub,
-                };
-                if (!user) {
-                    console.log("Yeni kullanıcı oluşturuluyor:", userData);
-                    // Yeni kullanıcı için profil fotoğrafını ekle
-                    user = new User_1.User(Object.assign(Object.assign({}, userData), { profilePhoto: googleUserInfo.picture }));
-                    yield user.save();
+                logger_1.default.info("GoogleService.handleAuth başladı", { data });
+                let googleUserInfo;
+                // idToken varsa doğrudan doğrula
+                if (data.user.id_token) {
+                    googleUserInfo = yield (0, googleAuth_1.verifyGoogleToken)(data.user.id_token);
+                }
+                // accessToken varsa Google API'den bilgileri al
+                else if (data.user.access_token) {
+                    googleUserInfo = yield this.getGoogleUserInfo(data.user.access_token);
                 }
                 else {
-                    const currentProfilePhoto = user.profilePhoto;
-                    console.log("Mevcut kullanıcı güncelleniyor:", {
-                        userId: user._id,
-                        mevcutProfilFoto: currentProfilePhoto,
-                    });
-                    // Önce diğer bilgileri güncelle
-                    user.firstName = userData.firstName;
-                    user.lastName = userData.lastName;
-                    user.emailVerified = userData.emailVerified;
-                    user.authProvider = userData.authProvider;
-                    user.lastLogin = userData.lastLogin;
-                    user.googleId = userData.googleId;
-                    // Eğer mevcut profil fotoğrafı yoksa, Google'dan gelen fotoğrafı kullan
-                    if (!currentProfilePhoto && googleUserInfo.picture) {
-                        console.log("Profil fotoğrafı ekleniyor çünkü mevcut fotoğraf yok");
-                        user.profilePhoto = googleUserInfo.picture;
+                    throw new Error("Geçerli bir token bulunamadı");
+                }
+                console.log("Google kullanıcı bilgileri alındı:", googleUserInfo);
+                logger_1.default.info("Google kullanıcı bilgileri alındı", { googleUserInfo });
+                // MongoDB'de kullanıcıyı ara veya oluştur
+                let user = yield User_1.User.findOne({ email: googleUserInfo.email });
+                // İsim ve soyisim bilgilerini ayır
+                const nameParts = (googleUserInfo.name || '').split(' ');
+                const firstName = nameParts[0] || ((_a = googleUserInfo.email) === null || _a === void 0 ? void 0 : _a.split('@')[0]) || '';
+                const lastName = nameParts.slice(1).join(' ') || firstName; // Eğer soyisim yoksa ismi kullan
+                const userData = {
+                    firstName,
+                    lastName,
+                    email: googleUserInfo.email,
+                    emailVerified: true,
+                    authProvider: "google",
+                    lastLogin: new Date(),
+                    googleId: googleUserInfo.uid || googleUserInfo.sub,
+                    profilePhoto: googleUserInfo.picture
+                };
+                if (!user) {
+                    user = yield User_1.User.create(userData);
+                    console.log("Yeni kullanıcı oluşturuldu:", user._id);
+                    logger_1.default.info("Yeni kullanıcı oluşturuldu", { userId: user._id });
+                }
+                else {
+                    const updatedUser = yield User_1.User.findByIdAndUpdate(user._id, { $set: userData }, { new: true });
+                    if (!updatedUser) {
+                        throw new Error("Kullanıcı güncellenemedi");
                     }
-                    else {
-                        console.log("Mevcut profil fotoğrafı korunuyor:", currentProfilePhoto);
-                    }
-                    yield user.save();
+                    user = updatedUser;
+                    console.log("Kullanıcı güncellendi:", user._id);
+                    logger_1.default.info("Kullanıcı güncellendi", { userId: user._id });
                 }
                 const jwtOptions = {
-                    expiresIn: process.env.JWT_EXPIRE
-                        ? parseInt(process.env.JWT_EXPIRE)
-                        : "24h",
+                    expiresIn: "90d",
                 };
                 const token = jsonwebtoken_1.default.sign({
                     id: user._id.toString(),
-                    googleId: googleUserInfo.sub,
+                    googleId: googleUserInfo.uid || googleUserInfo.sub,
                 }, process.env.JWT_SECRET || "your-super-secret-jwt-key", jwtOptions);
                 console.log("JWT token oluşturuldu", token);
+                logger_1.default.info("JWT token oluşturuldu", { userId: user._id.toString() });
                 return {
                     user: {
                         id: user._id.toString(),
@@ -92,22 +95,25 @@ class GoogleService {
             }
             catch (error) {
                 console.error("Google auth error:", error);
+                logger_1.default.error("Google auth error", { error: error.message, stack: error.stack });
                 throw new Error("Google ile giriş işlemi başarısız: " + error.message);
             }
         });
     }
     getGoogleUserInfo(accessToken) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
             try {
                 const response = yield axios_1.default.get("https://www.googleapis.com/oauth2/v3/userinfo", {
-                    headers: { Authorization: `Bearer ${accessToken}` },
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
                 });
                 return response.data;
             }
             catch (error) {
-                console.error("Google userinfo error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
-                throw new Error("Google kullanıcı bilgileri alınamadı");
+                console.error("Google user info error:", error);
+                logger_1.default.error("Google user info error", { error: error.message });
+                throw new Error("Google kullanıcı bilgileri alınamadı: " + error.message);
             }
         });
     }
