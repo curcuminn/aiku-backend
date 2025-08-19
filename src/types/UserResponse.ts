@@ -29,7 +29,7 @@ export interface UserResponse {
   subscriptionPeriod?: 'monthly' | 'yearly';
   subscriptionAmount?: number;
   autoRenewal?: boolean;
-  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other' | 'iap';
   savedCardId?: string;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;

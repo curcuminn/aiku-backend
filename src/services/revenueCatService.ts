@@ -16,12 +16,12 @@ interface RevenueCatWebhookEvent {
     purchased_at_ms: number;
     expiration_at_ms?: number;
     environment: string;
-    entitlement_id: string;
-    entitlement_ids: string[];
+    entitlement_id: string | null;
+    entitlement_ids: string[] | null;
     presented_offering_id?: string;
-    transaction_id: string;
-    original_transaction_id: string;
-    is_family_share: boolean;
+    transaction_id: string | null;
+    original_transaction_id: string | null;
+    is_family_share: boolean | null;
     country_code: string;
     app_id: string;
     offer_code?: string;
