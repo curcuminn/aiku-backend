@@ -5,7 +5,6 @@ yarn-debug.log
 yarn-error.log
 package-lock.json
 dist/
-yarn.lock
 
 # Environment variables
 .env
