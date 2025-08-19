@@ -41,4 +41,5 @@ export interface UserResponse {
   lastSeen?: Date;
   acceptChatNotification?: boolean;
   role?: 'admin' | 'user' | 'editor';
+  favoriteIdeas?: string[];
 } 
