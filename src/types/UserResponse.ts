@@ -29,7 +29,7 @@ export interface UserResponse {
   subscriptionPeriod?: 'monthly' | 'yearly';
   subscriptionAmount?: number;
   autoRenewal?: boolean;
-  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other' | 'iap';
   savedCardId?: string;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;
@@ -41,4 +41,5 @@ export interface UserResponse {
   lastSeen?: Date;
   acceptChatNotification?: boolean;
   role?: 'admin' | 'user' | 'editor';
+  favoriteIdeas?: string[];
 } 

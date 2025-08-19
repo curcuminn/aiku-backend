@@ -12,6 +12,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
 import { fetchAndStoreNews } from './controllers/newsController';
+import SubscriptionService from './services/SubscriptionService';
 import { ipBlocker } from './middleware/ipBlocker';
 
 // Route'ları import et
@@ -42,11 +43,14 @@ import investmentNewsRoutes from './routes/investmentNewsRoutes';
 import hubRoutes from "./routes/hubRoutes";
 import claimRequestRoutes from "./routes/claimRequestRoutes";
 import heartbeatRouter from './routes/heartbeat';
+import metaConversionsRoutes from "./routes/metaConversionsRoutes";
+import modalMessageRoutes from "./routes/modalMessageRoutes";
 import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
 import academicAiRoutes from "./routes/academicAiRoutes";
 import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRoutes";
+import revenueCatRoutes from "./routes/revenueCatRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -585,6 +589,26 @@ cron.schedule(NEWS_FETCH_SCHEDULE, () => {
     .catch(err => console.error('Haber çekme hatası:', err));
 });
 
+const SUBSCRIPTION_CRON_SCHEDULE = process.env.SUBSCRIPTION_CRON_SCHEDULE || '0 4 * * *'; // her gün 04:00
+
+cron.schedule(SUBSCRIPTION_CRON_SCHEDULE, async () => {
+  try {
+    logger.info('⏰ Abonelik cron çalışıyor: trial kontrol');
+    const trialResult = await SubscriptionService.checkTrialEndingUsers();
+    logger.info('Trial kontrol sonucu:', { trialResult });
+
+    logger.info('⏰ Abonelik cron çalışıyor: periyodik ödeme kontrol');
+    const recurringResult = await SubscriptionService.checkRecurringPayments();
+    logger.info('Periyodik ödeme kontrol sonucu:', { recurringResult });
+
+    logger.info('⏰ Abonelik cron çalışıyor: expire işlemleri');
+    const expireResult = await SubscriptionService.expireEndedSubscriptions();
+    logger.info('Expire işlemleri sonucu:', { expireResult });
+  } catch (err) {
+    logger.error('Abonelik cron hatası:', { error: err });
+  }
+});
+
 // MongoDB bağlantısı
 mongoose
   .connect(process.env.MONGODB_URI!)
@@ -628,6 +652,9 @@ app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
 app.use('/api/heartbeat', heartbeatRouter);
 app.use("/api/idea-favorites", startupIdeaFavoriteCountRoutes);
+app.use("/api/meta", metaConversionsRoutes);
+app.use("/api/modal-messages", modalMessageRoutes);
+app.use("/api/revenuecat", revenueCatRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

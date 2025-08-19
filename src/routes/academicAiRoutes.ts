@@ -7,6 +7,8 @@ import { AcademicMessage } from "../models/AcademicMessage";
 import * as ctrl from "../controllers/academicChatController";
 
 const router = express.Router();
+import MetaConversionsService from "../services/metaConversionsService";
+const meta = new MetaConversionsService();
 const geminiAcademicService = new GeminiAcademicService();
 
 router.post("/chat", async (req: Request, res: Response) => {
@@ -24,6 +26,20 @@ router.post("/chat", async (req: Request, res: Response) => {
         lastMessageText: message,
         lastMessageDate: new Date(),
       });
+
+      // Fire a conversions event for a new academic chat session
+      // Non-blocking: do not await
+      meta
+        .sendEvent({
+          eventName: "AcademicChat_Started",
+          user: {
+            email: undefined,
+            phone: undefined,
+            clientIpAddress: (req.headers["x-real-ip"] as string) || req.ip,
+            clientUserAgent: req.headers["user-agent"] as string,
+          },
+        })
+        .catch(() => {});
     } else if (!session.participantName && name) {
       session.participantName = name;
     }
@@ -33,7 +49,7 @@ router.post("/chat", async (req: Request, res: Response) => {
       .limit(25)
       .lean();
 
-    let history = pastMessages.map(m => ({
+    const history = pastMessages.map(m => ({
       role: m.role
         ? (m.role === "assistant" ? "model" : "user")
         : "user",

@@ -401,6 +401,9 @@ export const login = async (req: Request, res: Response) => {
       isOnline: user.isOnline,
       lastSeen: user.lastSeen,
       acceptChatNotification: user.acceptChatNotification,
+      favoriteIdeas: Array.isArray((user as any).favoriteIdeas)
+          ? (user as any).favoriteIdeas
+          : [],
     };
 
     res.status(200).json({

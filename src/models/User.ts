@@ -23,6 +23,7 @@ export interface IUser extends Document {
   linkedinId?: string; // LinkedIn ID 
   supabaseId?: string; // Supabase ID
   supabaseMetadata?: any; // Supabase meta verileri
+  revenueCatId?: string; // RevenueCat app_user_id
   emailVerified: boolean;
   emailVerificationToken: string;
   emailVerificationExpires: Date;
@@ -49,7 +50,7 @@ export interface IUser extends Document {
   subscriptionPeriod?: 'monthly' | 'yearly';
   subscriptionAmount?: number;
   autoRenewal?: boolean;
-  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other' | 'iap';
   savedCardId?: mongoose.Types.ObjectId;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;
@@ -187,6 +188,11 @@ const userSchema = new Schema<IUser>({
   supabaseMetadata: { // Supabase meta verileri için alan
     type: Schema.Types.Mixed
   },
+  revenueCatId: { // RevenueCat app_user_id için alan
+    type: String,
+    sparse: true,
+    index: true
+  },
   emailVerified: {
     type: Boolean,
     default: false
@@ -284,7 +290,7 @@ const userSchema = new Schema<IUser>({
   },
   paymentMethod: {
     type: String,
-    enum: ['creditCard', 'bankTransfer', 'other'],
+    enum: ['creditCard', 'bankTransfer', 'iap', 'other'],
     default: 'creditCard'
   },
   savedCardId: {
@@ -302,6 +308,8 @@ const userSchema = new Schema<IUser>({
       {
         amount: Number,
         date: Date,
+        platform: String, // 'APP_STORE', 'PLAY_STORE', 'WEB'
+        iapTransactionId: String, // IAP transaction ID'si
         status: String,
         transactionId: String,
         description: String,
@@ -479,12 +487,33 @@ userSchema.methods.checkAutoRenewal = async function () {
           return true;
         } else {
           // Ödeme başarısız ise durumu güncelle
+          if (!this.paymentHistory) this.paymentHistory = [];
+          this.paymentHistory.push({
+            amount: this.subscriptionAmount || 0,
+            date: new Date(),
+            status: 'failed',
+            description: 'Otomatik abonelik yenileme başarısız',
+            type: 'subscription',
+            plan: this.subscriptionPlan,
+            period: this.subscriptionPeriod
+          });
           this.subscriptionStatus = 'expired';
           await this.save();
           return false;
         }
       } catch (error) {
         console.error('Otomatik ödeme işleminde hata:', error);
+        if (!this.paymentHistory) this.paymentHistory = [];
+        this.paymentHistory.push({
+          amount: this.subscriptionAmount || 0,
+          date: new Date(),
+          status: 'failed',
+          description: 'Otomatik abonelik yenileme hata nedeniyle başarısız',
+          type: 'subscription',
+          plan: this.subscriptionPlan,
+          period: this.subscriptionPeriod
+        });
+        await this.save();
         return false;
       }
     } else {

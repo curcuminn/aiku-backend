@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { User, IUser } from '../models/User';
+import logger from '../config/logger';
 
 /**
  * Abonelik servis yönetimi
@@ -58,7 +59,7 @@ class SubscriptionService {
       });
       
       console.log(`${users.length} kullanıcının ödeme tarihi gelmiş, otomatik ödeme işlemi yapılıyor...`);
-      
+      logger.info(`${users.length} kullanıcının ödeme tarihi gelmiş, otomatik ödeme işlemi yapılıyor...`);
       let successCount = 0;
       let failCount = 0;
       
@@ -154,6 +155,67 @@ class SubscriptionService {
       return {
         success: false,
         error: error.message
+      };
+    }
+  }
+
+  /**
+   * Otomatik yenilemesi kapalı olan veya ödeme yöntemi olmayan kullanıcıların
+   * süresi dolmuş aboneliklerini sonlandırır (expire eder)
+   */
+  async expireEndedSubscriptions() {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 1) Trial süresi bitmiş, ancak otomatik yenileme kapalı veya kartı olmayan kullanıcılar
+      const expiredTrials = await User.updateMany(
+        {
+          subscriptionStatus: 'trial',
+          trialEndsAt: { $lte: today },
+          $or: [
+            { autoRenewal: { $ne: true } },
+            { savedCardId: { $exists: false } },
+            { savedCardId: null },
+          ],
+        },
+        {
+          $set: {
+            subscriptionStatus: 'expired',
+            isSubscriptionActive: false,
+          },
+        }
+      );
+
+      // 2) Aktif aboneliklerde ödeme tarihi geçmiş ve otomatik yenileme kapalı olan kullanıcılar
+      const expiredActives = await User.updateMany(
+        {
+          subscriptionStatus: 'active',
+          nextPaymentDate: { $lte: today },
+          $or: [
+            { autoRenewal: { $ne: true } },
+            { savedCardId: { $exists: false } },
+            { savedCardId: null },
+          ],
+        },
+        {
+          $set: {
+            subscriptionStatus: 'expired',
+            isSubscriptionActive: false,
+          },
+        }
+      );
+
+      return {
+        success: true,
+        expiredTrialCount: (expiredTrials as any)?.modifiedCount || 0,
+        expiredActiveCount: (expiredActives as any)?.modifiedCount || 0,
+      };
+    } catch (error: any) {
+      logger.error('Abonelikleri expire ederken hata:', { error });
+      return {
+        success: false,
+        error: error.message,
       };
     }
   }
