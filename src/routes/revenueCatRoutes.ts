@@ -4,7 +4,8 @@ import {
   checkUserSubscriptionStatus,
   getUserRevenueCatInfo,
   getMobileSubscriptionPlans,
-  checkPaymentMethod
+  checkPaymentMethod,
+  testWebhook
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -16,6 +17,12 @@ const router = express.Router();
  * Authentication gerektirmez çünkü RevenueCat'ten gelir
  */
 router.post('/webhook', handleRevenueCatWebhook);
+
+/**
+ * Test webhook endpoint (sadece geliştirme ortamında)
+ * GET /api/revenuecat/test-webhook
+ */
+router.get('/test-webhook', testWebhook);
 
 /**
  * Kullanıcının RevenueCat abonelik durumunu kontrol eder

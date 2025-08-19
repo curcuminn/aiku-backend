@@ -129,6 +129,62 @@ export const getUserRevenueCatInfo = async (
 };
 
 /**
+ * Test webhook endpoint'i - sadece geliştirme ortamında
+ */
+export const testWebhook = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const testEvent = {
+      api_version: '1.0',
+      event: {
+        type: 'TEST',
+        id: 'test-event-id',
+        app_user_id: 'test-user-id',
+        product_id: 'test_product',
+        period_type: 'NORMAL',
+        purchased_at_ms: Date.now(),
+        expiration_at_ms: Date.now() + (2 * 60 * 60 * 1000), // 2 saat sonra
+        environment: 'SANDBOX',
+        entitlement_id: null,
+        entitlement_ids: null,
+        presented_offering_id: null,
+        transaction_id: null,
+        original_transaction_id: null,
+        is_family_share: null,
+        country_code: 'US',
+        original_app_user_id: 'test-user-id',
+        aliases: [],
+        currency: null,
+        price: null,
+        price_in_purchased_currency: null,
+        subscriber_attributes: {},
+        store: 'APP_STORE',
+        takehome_percentage: null,
+        offer_code: null,
+        tax_percentage: null,
+        commission_percentage: null,
+        metadata: null,
+        renewal_number: null,
+        app_id: 'test-app-id'
+      }
+    };
+
+    const result = await revenueCatService.handleWebhook(testEvent);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Test webhook processed',
+      result
+    });
+  } catch (error: any) {
+    logger.error('Test webhook hatası', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
  * Mobil uygulama için abonelik planlarını döndürür
  */
 export const getMobileSubscriptionPlans = async (

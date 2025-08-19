@@ -23,6 +23,7 @@ export interface IUser extends Document {
   linkedinId?: string; // LinkedIn ID 
   supabaseId?: string; // Supabase ID
   supabaseMetadata?: any; // Supabase meta verileri
+  revenueCatId?: string; // RevenueCat app_user_id
   emailVerified: boolean;
   emailVerificationToken: string;
   emailVerificationExpires: Date;
@@ -49,7 +50,7 @@ export interface IUser extends Document {
   subscriptionPeriod?: 'monthly' | 'yearly';
   subscriptionAmount?: number;
   autoRenewal?: boolean;
-  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other' | 'iap';
   savedCardId?: mongoose.Types.ObjectId;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;
@@ -186,6 +187,11 @@ const userSchema = new Schema<IUser>({
   },
   supabaseMetadata: { // Supabase meta verileri için alan
     type: Schema.Types.Mixed
+  },
+  revenueCatId: { // RevenueCat app_user_id için alan
+    type: String,
+    sparse: true,
+    index: true
   },
   emailVerified: {
     type: Boolean,

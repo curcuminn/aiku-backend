@@ -59,6 +59,15 @@ class RevenueCatService {
         transactionId: webhookEvent.transaction_id
       });
 
+      // Test event'leri için özel işleme
+      if (webhookEvent.type === 'TEST') {
+        logger.info('RevenueCat test event alındı', {
+          appUserId: webhookEvent.app_user_id,
+          productId: webhookEvent.product_id
+        });
+        return { success: true, message: 'Test event processed successfully' };
+      }
+
       // Kullanıcıyı bul (app_user_id genellikle email veya custom user ID)
       const user = await this.findUserByRevenueCatId(webhookEvent.app_user_id);
       
