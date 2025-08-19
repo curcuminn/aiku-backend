@@ -49,6 +49,7 @@ import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
 import academicAiRoutes from "./routes/academicAiRoutes";
+import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRoutes";
 import revenueCatRoutes from "./routes/revenueCatRoutes";
 
 // Env değişkenlerini yükle
@@ -650,6 +651,7 @@ app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
 app.use('/api/heartbeat', heartbeatRouter);
+app.use("/api/idea-favorites", startupIdeaFavoriteCountRoutes);
 app.use("/api/meta", metaConversionsRoutes);
 app.use("/api/modal-messages", modalMessageRoutes);
 app.use("/api/revenuecat", revenueCatRoutes);
