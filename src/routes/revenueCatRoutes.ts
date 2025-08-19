@@ -5,7 +5,10 @@ import {
   getUserRevenueCatInfo,
   getMobileSubscriptionPlans,
   checkPaymentMethod,
-  testWebhook
+  testWebhook,
+  syncRevenueCatId,
+  createTestUser,
+  getTestUser
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -23,6 +26,24 @@ router.post('/webhook', handleRevenueCatWebhook);
  * GET /api/revenuecat/test-webhook
  */
 router.get('/test-webhook', testWebhook);
+
+/**
+ * RevenueCat ID senkronizasyon endpoint'i
+ * POST /api/revenuecat/sync-user
+ */
+router.post('/sync-user', protect, syncRevenueCatId);
+
+/**
+ * Test kullanıcısı oluşturma endpoint'i (sadece geliştirme ortamında)
+ * POST /api/revenuecat/test-user
+ */
+router.post('/test-user', createTestUser);
+
+/**
+ * Test kullanıcısı bilgilerini getirme endpoint'i
+ * GET /api/revenuecat/test-user/:userId
+ */
+router.get('/test-user/:userId', getTestUser);
 
 /**
  * Kullanıcının RevenueCat abonelik durumunu kontrol eder

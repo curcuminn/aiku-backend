@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import revenueCatService from '../services/revenueCatService';
 import revenueCatConfig from '../config/revenueCat';
 import logger from '../config/logger';
+import { User } from '../models/User';
 
 /**
  * RevenueCat webhook'larını işler
@@ -263,6 +264,177 @@ export const checkPaymentMethod = async (
     res.status(500).json({
       success: false,
       message: 'Ödeme yöntemi kontrol edilemedi',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Kullanıcının RevenueCat ID'sini senkronize eder
+ * Mobil uygulamada abonelik alındığında çağrılır
+ */
+export const syncRevenueCatId = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { userId, revenueCatId } = req.body;
+    
+    if (!userId || !revenueCatId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId ve revenueCatId gerekli'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // RevenueCat ID'yi kaydet
+    user.revenueCatId = revenueCatId;
+    await user.save();
+
+    logger.info('RevenueCat ID senkronize edildi', {
+      userId: user._id,
+      revenueCatId
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'RevenueCat ID başarıyla senkronize edildi'
+    });
+  } catch (error: any) {
+    logger.error('RevenueCat ID senkronizasyon hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Senkronizasyon hatası',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Test için basit kullanıcı oluşturur (sadece geliştirme ortamında)
+ */
+export const createTestUser = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { email, firstName, lastName } = req.body;
+    
+    if (!email || !firstName || !lastName) {
+      return res.status(400).json({
+        success: false,
+        message: 'email, firstName ve lastName gerekli'
+      });
+    }
+
+    // Kullanıcı var mı kontrol et
+    let user = await User.findOne({ email });
+    
+    if (user) {
+      return res.status(200).json({
+        success: true,
+        message: 'Kullanıcı zaten mevcut',
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          revenueCatId: user.revenueCatId
+        }
+      });
+    }
+
+    // Yeni test kullanıcısı oluştur
+    user = new User({
+      email,
+      firstName,
+      lastName,
+      emailVerified: true,
+      authProvider: 'email',
+      accountStatus: 'active'
+    });
+
+    await user.save();
+
+    logger.info('Test kullanıcısı oluşturuldu', {
+      userId: user._id,
+      email: user.email
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Test kullanıcısı oluşturuldu',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        revenueCatId: user.revenueCatId
+      }
+    });
+  } catch (error: any) {
+    logger.error('Test kullanıcısı oluşturma hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Kullanıcı oluşturulamadı',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Test kullanıcısı bilgilerini getirir
+ */
+export const getTestUser = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId gerekli'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        revenueCatId: user.revenueCatId,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionPlan: user.subscriptionPlan,
+        paymentMethod: user.paymentMethod
+      }
+    });
+  } catch (error: any) {
+    logger.error('Test kullanıcısı getirme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Kullanıcı bilgileri alınamadı',
       error: error.message
     });
   }
