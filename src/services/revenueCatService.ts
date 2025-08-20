@@ -408,11 +408,11 @@ class RevenueCatService {
    * RevenueCat app_user_id ile kullanıcıyı bulur
    */
   private async findUserByRevenueCatId(appUserId: string) {
-    // Önce email ile dene (RevenueCat'te app_user_id genellikle email)
-    let user = await User.findOne({ email: appUserId });
+    // Önce User ID ile dene (RevenueCat'te app_user_id olarak User ID kullanılıyor)
+    let user = await User.findById(appUserId);
     
     if (!user) {
-      // Eğer email ile bulunamazsa, custom field ile dene
+      // Eğer User ID ile bulunamazsa, revenueCatId field'ı ile dene
       user = await User.findOne({ 'revenueCatId': appUserId });
     }
     
