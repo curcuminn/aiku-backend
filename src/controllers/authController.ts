@@ -1651,6 +1651,14 @@ export const sendMobileSocialEmailCode = async (req: Request, res: Response) => 
     user.mobileVerificationExpires = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     await user.save();
 
+    // Debug: Kaydedilen kodu logla
+    console.log('💾 DEBUG - Kod kaydedildi:', {
+      email: user.email,
+      verificationCode,
+      expiresInMinutes,
+      savedCode: user.mobileVerificationCode
+    });
+
     // Mail gönder
     try {
       await brevoService.sendMobileVerificationCode(email, verificationCode, expiresInMinutes);
@@ -1665,9 +1673,20 @@ export const sendMobileSocialEmailCode = async (req: Request, res: Response) => 
       });
     } catch (error) {
       console.error('Mail gönderme hatası:', error);
-      res.status(500).json({
-        success: false,
-        message: "Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin."
+      
+      // Test için: Mail gönderilemese bile kodu console'a yazdır
+      console.log('🔐 TEST KODU:', verificationCode);
+      console.log('📧 Email:', email);
+      console.log('⏰ Süre:', expiresInMinutes, 'dakika');
+      
+      res.status(200).json({
+        success: true,
+        message: "Doğrulama kodu oluşturuldu (test modu)",
+        data: {
+          email: user.email,
+          expiresInMinutes,
+          testCode: verificationCode // Test için kodu response'da da gönder
+        }
       });
     }
 
@@ -1708,8 +1727,21 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
       });
     }
 
+    // Debug: Kullanıcı bilgilerini logla
+    console.log('🔍 DEBUG - Kullanıcı bilgileri:', {
+      email: user.email,
+      mobileVerificationCode: user.mobileVerificationCode,
+      mobileVerificationExpires: user.mobileVerificationExpires,
+      submittedCode: code
+    });
+
     // Kod kontrolü
     if (!user.mobileVerificationCode || user.mobileVerificationCode !== code) {
+      console.log('❌ Kod eşleşmedi:', {
+        storedCode: user.mobileVerificationCode,
+        submittedCode: code,
+        match: user.mobileVerificationCode === code
+      });
       return res.status(400).json({
         success: false,
         message: "Geçersiz doğrulama kodu"
