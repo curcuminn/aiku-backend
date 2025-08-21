@@ -1571,7 +1571,7 @@ export const checkUserAuthMethod = async (req: Request, res: Response) => {
     }
 
     // Giriş yöntemini belirle - sadece authProvider alanına bak
-    let authMethod = user.authProvider || 'email';
+    const authMethod = user.authProvider || 'email';
     let hasPassword = !!user.password;
     let socialProvider = null;
 
@@ -1718,7 +1718,7 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
     // Kullanıcıyı bul - select: false alanları da getir
     const user = await User.findOne({ 
       email: email.toLowerCase().trim() 
-    }).select('+mobileVerificationCode +mobileVerificationExpires');
+    }).select('+mobileVerificationCode +mobileVerificationExpires email accountStatus authProvider');
 
     if (!user) {
       return res.status(404).json({
