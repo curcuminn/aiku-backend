@@ -26,7 +26,9 @@ import {
   deleteUserById,
   checkUserAuthMethod,
   sendMobileSocialEmailCode,
-  verifyMobileSocialEmailCode
+  verifyMobileSocialEmailCode,
+  sendPasswordResetCode,
+  verifyPasswordResetCode
 } from "../controllers/authController";
 import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
@@ -333,5 +335,16 @@ router.get("/verify-email/:token", verifyEmail);
 router.post("/resend-verification", [
   check("email", "Please enter a valid email address.").isEmail(),
 ], resendVerificationEmail);
+
+// Şifre sıfırlama rotaları
+router.post("/forgot-password", [
+  check("email", "Email adresi gereklidir").notEmpty(),
+], sendPasswordResetCode);
+
+router.post("/reset-password", [
+  check("email", "Email adresi gereklidir").notEmpty(),
+  check("code", "Doğrulama kodu gereklidir").notEmpty(),
+  check("newPassword", "Yeni şifre en az 6 karakter olmalıdır").isLength({ min: 6 }),
+], verifyPasswordResetCode);
 
 export default router;

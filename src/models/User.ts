@@ -32,6 +32,8 @@ export interface IUser extends Document {
   emailChangeExpires?: Date;
   mobileVerificationCode?: string;
   mobileVerificationExpires?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   locale?: {
     country: string;
     language: string;
@@ -233,6 +235,20 @@ const userSchema = new Schema<IUser>({
     select: false
   },
   mobileVerificationExpires: {
+    type: Date,
+    select: false
+  },
+  // Şifre sıfırlama kodları
+  passwordResetCode: {
+    type: String,
+    select: false
+  },
+  // Şifre sıfırlama kodları
+  passwordResetToken: {
+    type: String,
+    select: false
+  },
+  passwordResetExpires: {
     type: Date,
     select: false
   },

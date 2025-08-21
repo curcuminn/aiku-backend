@@ -1829,3 +1829,208 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
     });
   }
 };
+
+/**
+ * Şifre sıfırlama kodu gönderir
+ * @param req Express request
+ * @param res Express response
+ */
+export const sendPasswordResetCode = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email adresi gereklidir"
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    }).select('email accountStatus authProvider password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Hesap durumunu kontrol et
+    if (user.accountStatus !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: "Hesabınız aktif değil"
+      });
+    }
+
+    // Sosyal medya ile giriş yapmış kullanıcılar için şifre sıfırlama yapılamaz
+    if (user.authProvider !== 'email' || !user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Bu hesap sosyal medya ile kayıt olmuş. Şifre sıfırlama yapılamaz."
+      });
+    }
+
+    // 6 haneli kod oluştur
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresInMinutes = 15; // 15 dakika geçerli
+
+    // Kullanıcıya şifre sıfırlama kodunu kaydet
+    user.passwordResetToken = resetCode;
+    user.passwordResetExpires = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    await user.save();
+
+    // Debug: Kaydedilen kodu logla
+    console.log('💾 DEBUG - Şifre sıfırlama kodu kaydedildi:', {
+      email: user.email,
+      resetCode,
+      expiresInMinutes,
+      savedCode: user.passwordResetToken
+    });
+
+    // Mail gönder
+    try {
+      await brevoService.sendPasswordResetCode(email, resetCode, expiresInMinutes);
+      
+      res.status(200).json({
+        success: true,
+        message: "Şifre sıfırlama kodu email adresinize gönderildi",
+        data: {
+          email: user.email,
+          expiresInMinutes
+        }
+      });
+    } catch (error) {
+      console.error('Mail gönderme hatası:', error);
+      
+      // Test için: Mail gönderilemese bile kodu console'a yazdır
+      console.log('🔐 TEST ŞİFRE SIFIRLAMA KODU:', resetCode);
+      console.log('📧 Email:', email);
+      console.log('⏰ Süre:', expiresInMinutes, 'dakika');
+      
+      res.status(200).json({
+        success: true,
+        message: "Şifre sıfırlama kodu oluşturuldu (test modu)",
+        data: {
+          email: user.email,
+          expiresInMinutes,
+          testCode: resetCode // Test için kodu response'da da gönder
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Şifre sıfırlama kodu gönderme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası oluştu"
+    });
+  }
+};
+
+/**
+ * Şifre sıfırlama kodunu doğrular ve yeni şifre belirler
+ * @param req Express request
+ * @param res Express response
+ */
+export const verifyPasswordResetCode = async (req: Request, res: Response) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email adresi, doğrulama kodu ve yeni şifre gereklidir"
+      });
+    }
+
+    // Yeni şifre validasyonu
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Yeni şifre en az 6 karakter olmalıdır"
+      });
+    }
+
+    // Kullanıcıyı bul - select: false alanları da getir
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    }).select('+passwordResetToken +passwordResetExpires email accountStatus authProvider password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Hesap durumunu kontrol et
+    if (user.accountStatus !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: "Hesabınız aktif değil"
+      });
+    }
+
+    // Sosyal medya ile giriş yapmış kullanıcılar için şifre sıfırlama yapılamaz
+    if (user.authProvider !== 'email' || !user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Bu hesap sosyal medya ile kayıt olmuş. Şifre sıfırlama yapılamaz."
+      });
+    }
+
+    // Debug: Kullanıcı bilgilerini logla
+    console.log('🔍 DEBUG - Şifre sıfırlama kullanıcı bilgileri:', {
+      email: user.email,
+      passwordResetToken: user.passwordResetToken,
+      passwordResetExpires: user.passwordResetExpires,
+      submittedCode: code
+    });
+
+    // Kod kontrolü
+    if (!user.passwordResetToken || user.passwordResetToken !== code) {
+      console.log('❌ Şifre sıfırlama kodu eşleşmedi:', {
+        storedCode: user.passwordResetToken,
+        submittedCode: code,
+        match: user.passwordResetToken === code
+      });
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz doğrulama kodu"
+      });
+    }
+
+    // Süre kontrolü
+    if (!user.passwordResetExpires || new Date() > user.passwordResetExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "Doğrulama kodunun süresi dolmuş"
+      });
+    }
+
+    // Yeni şifreyi hashle ve kaydet
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
+    // Kodu temizle
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Şifreniz başarıyla güncellendi"
+    });
+
+  } catch (error) {
+    console.error('Şifre sıfırlama kodu doğrulama hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası oluştu"
+    });
+  }
+};
