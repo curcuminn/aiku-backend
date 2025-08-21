@@ -30,6 +30,8 @@ export interface IUser extends Document {
   newEmail?: string;
   emailChangeToken?: string;
   emailChangeExpires?: Date;
+  mobileVerificationCode?: string;
+  mobileVerificationExpires?: Date;
   locale?: {
     country: string;
     language: string;
@@ -222,6 +224,15 @@ const userSchema = new Schema<IUser>({
     select: false
   },
   emailChangeExpires: {
+    type: Date,
+    select: false
+  },
+  // Mobil sosyal email doğrulama kodları
+  mobileVerificationCode: {
+    type: String,
+    select: false
+  },
+  mobileVerificationExpires: {
     type: Date,
     select: false
   },

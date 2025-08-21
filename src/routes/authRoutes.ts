@@ -24,7 +24,9 @@ import {
   confirmEmailChange,
   deleteCurrentUser,
   deleteUserById,
-  checkUserAuthMethod
+  checkUserAuthMethod,
+  sendMobileSocialEmailCode,
+  verifyMobileSocialEmailCode
 } from "../controllers/authController";
 import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
@@ -56,6 +58,25 @@ router.post(
     check("email", "Email adresi gereklidir").notEmpty(),
   ],
   checkUserAuthMethod
+);
+
+// Mobil sosyal email kodu gönderme
+router.post(
+  "/mobile/send-social-email-code",
+  [
+    check("email", "Email adresi gereklidir").isEmail().normalizeEmail(),
+  ],
+  sendMobileSocialEmailCode
+);
+
+// Mobil sosyal email kodu doğrulama
+router.post(
+  "/mobile/verify-social-email-code",
+  [
+    check("email", "Email adresi gereklidir").isEmail().normalizeEmail(),
+    check("code", "Doğrulama kodu gereklidir").isLength({ min: 6, max: 6 }),
+  ],
+  verifyMobileSocialEmailCode
 );
 
 router.post(

@@ -1605,3 +1605,195 @@ export const checkUserAuthMethod = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Mobil için sosyal email kodu gönderir
+ * @param req Express request
+ * @param res Express response
+ */
+export const sendMobileSocialEmailCode = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email adresi gereklidir"
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Hesap durumunu kontrol et
+    if (user.accountStatus !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: "Hesabınız aktif değil"
+      });
+    }
+
+    // 6 haneli kod oluştur
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresInMinutes = 10; // 10 dakika geçerli
+
+    // Kullanıcıya geçici kod alanları ekle (User modelinde yoksa eklenebilir)
+    user.mobileVerificationCode = verificationCode;
+    user.mobileVerificationExpires = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    await user.save();
+
+    // Mail gönder
+    try {
+      await brevoService.sendMobileVerificationCode(email, verificationCode, expiresInMinutes);
+      
+      res.status(200).json({
+        success: true,
+        message: "Doğrulama kodu email adresinize gönderildi",
+        data: {
+          email: user.email,
+          expiresInMinutes
+        }
+      });
+    } catch (error) {
+      console.error('Mail gönderme hatası:', error);
+      res.status(500).json({
+        success: false,
+        message: "Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin."
+      });
+    }
+
+  } catch (error) {
+    console.error('Mobil sosyal email kodu gönderme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası oluştu"
+    });
+  }
+};
+
+/**
+ * Mobil için sosyal email kodunu doğrular
+ * @param req Express request
+ * @param res Express response
+ */
+export const verifyMobileSocialEmailCode = async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Email adresi ve doğrulama kodu gereklidir"
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Kod kontrolü
+    if (!user.mobileVerificationCode || user.mobileVerificationCode !== code) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz doğrulama kodu"
+      });
+    }
+
+    // Süre kontrolü
+    if (!user.mobileVerificationExpires || new Date() > user.mobileVerificationExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "Doğrulama kodunun süresi dolmuş"
+      });
+    }
+
+    // Kodu temizle ve kullanıcıyı güncelle
+    user.mobileVerificationCode = undefined;
+    user.mobileVerificationExpires = undefined;
+    user.lastLogin = new Date();
+    user.isOnline = true;
+    await user.save();
+
+    // JWT token oluştur
+    const token = createToken(user._id);
+
+    // Kullanıcı bilgilerini hazırla
+    const hasActiveSubscription = user.subscriptionStatus === "active" || user.subscriptionStatus === "trial";
+
+    const userResponse: UserResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      accountStatus: user.accountStatus,
+      phone: user.phone,
+      countryCode: user.countryCode,
+      localPhone: user.localPhone,
+      title: user.title,
+      location: user.location,
+      profileInfo: user.profileInfo,
+      profilePhoto: user.profilePhoto,
+      linkedin: user.linkedin,
+      instagram: user.instagram,
+      facebook: user.facebook,
+      twitter: user.twitter,
+      emailVerified: user.emailVerified,
+      locale: user.locale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStartDate: user.subscriptionStartDate,
+      trialEndsAt: user.trialEndsAt,
+      subscriptionPlan: user.subscriptionPlan || undefined,
+      subscriptionPeriod: user.subscriptionPeriod,
+      subscriptionAmount: user.subscriptionAmount,
+      autoRenewal: user.autoRenewal,
+      paymentMethod: user.paymentMethod,
+      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+      lastPaymentDate: user.lastPaymentDate,
+      nextPaymentDate: user.nextPaymentDate,
+      billingAddress: user.billingAddress,
+      vatNumber: user.vatNumber,
+      isSubscriptionActive: hasActiveSubscription,
+      isAngelInvestor: user.isAngelInvestor,
+      role: user.role,
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+      acceptChatNotification: user.acceptChatNotification,
+      favoriteIdeas: Array.isArray((user as any).favoriteIdeas)
+          ? (user as any).favoriteIdeas
+          : [],
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Doğrulama başarılı",
+      token,
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('Mobil sosyal email kodu doğrulama hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası oluştu"
+    });
+  }
+};

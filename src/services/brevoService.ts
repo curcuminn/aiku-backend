@@ -82,6 +82,29 @@ class BrevoService {
             throw new Error('Chat email sending failed.');
         }
     }
+
+    async sendMobileVerificationCode(email: string, code: string, expiresInMinutes: number): Promise<void> {
+        const sendSmtpEmail = {
+            to: [{ email }],
+            templateId: 2, // <-- Email change template'ini kullan (aynı parametreler)
+            params: {
+                code,
+                expires: expiresInMinutes,
+            },
+            headers: {
+                'X-Mailin-custom': 'mobile-verification-code',
+            },
+        };
+
+        try {
+            console.log('Sending mobile verification code to:', email);
+            await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+            console.log('Mobile verification code sent successfully');
+        } catch (error) {
+            console.error('Failed to send mobile verification code:', error);
+            throw new Error('Mobile verification code sending failed.');
+        }
+    }
 }
 
 export const brevoService = new BrevoService();
