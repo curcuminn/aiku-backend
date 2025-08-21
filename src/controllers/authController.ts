@@ -1570,23 +1570,18 @@ export const checkUserAuthMethod = async (req: Request, res: Response) => {
       });
     }
 
-    // Giriş yöntemini belirle
-    let authMethod = 'email';
-    let hasPassword = false;
+    // Giriş yöntemini belirle - sadece authProvider alanına bak
+    let authMethod = user.authProvider || 'email';
+    let hasPassword = !!user.password;
     let socialProvider = null;
 
-    if (user.authProvider === 'google' || user.googleId) {
-      authMethod = 'google';
+    // Social provider'ı belirle
+    if (authMethod === 'google') {
       socialProvider = 'google';
-    } else if (user.authProvider === 'linkedin' || user.linkedinId) {
-      authMethod = 'linkedin';
+    } else if (authMethod === 'linkedin') {
       socialProvider = 'linkedin';
-    } else if (user.authProvider === 'supabase' || user.supabaseId) {
-      authMethod = 'supabase';
-      socialProvider = 'supabase';
-    } else {
+    } else if (authMethod === 'email') {
       // Email ile kayıt olmuş kullanıcı
-      authMethod = 'email';
       hasPassword = !!user.password;
     }
 
