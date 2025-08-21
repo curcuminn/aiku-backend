@@ -23,7 +23,8 @@ import {
   requestEmailChange,
   confirmEmailChange,
   deleteCurrentUser,
-  deleteUserById
+  deleteUserById,
+  checkUserAuthMethod
 } from "../controllers/authController";
 import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
@@ -48,7 +49,15 @@ router.post(
   register
 );
 
-// Giriş rotası
+
+router.post(
+  "/check-auth-method",
+  [
+    check("email", "Email adresi gereklidir").notEmpty(),
+  ],
+  checkUserAuthMethod
+);
+
 router.post(
   "/login",
   [

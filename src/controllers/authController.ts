@@ -1538,3 +1538,75 @@ export const logout = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const checkUserAuthMethod = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email adresi gereklidir"
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim() 
+    }).select('email authProvider googleId linkedinId supabaseId password accountStatus');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Hesap durumunu kontrol et
+    if (user.accountStatus !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: "Hesabınız aktif değil"
+      });
+    }
+
+    // Giriş yöntemini belirle
+    let authMethod = 'email';
+    let hasPassword = false;
+    let socialProvider = null;
+
+    if (user.authProvider === 'google' || user.googleId) {
+      authMethod = 'google';
+      socialProvider = 'google';
+    } else if (user.authProvider === 'linkedin' || user.linkedinId) {
+      authMethod = 'linkedin';
+      socialProvider = 'linkedin';
+    } else if (user.authProvider === 'supabase' || user.supabaseId) {
+      authMethod = 'supabase';
+      socialProvider = 'supabase';
+    } else {
+      // Email ile kayıt olmuş kullanıcı
+      authMethod = 'email';
+      hasPassword = !!user.password;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        email: user.email,
+        authMethod,
+        hasPassword,
+        socialProvider,
+        canLoginWithPassword: hasPassword,
+        requiresSocialLogin: !hasPassword && socialProvider !== null
+      }
+    });
+
+  } catch (error) {
+    console.error('Kullanıcı giriş yöntemi kontrolünde hata:', error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası oluştu"
+    });
+  }
+};
