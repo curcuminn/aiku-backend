@@ -85,6 +85,9 @@ class LinkedInAuthController {
         mongoUser.supabaseId = userData.id;
         mongoUser.linkedinId = userInfo.id;
         mongoUser.lastLogin = new Date();
+        
+        // Her LinkedIn girişinde authProvider'ı güncelle
+        mongoUser.authProvider = "linkedin";
 
         if (!mongoUser.firstName) mongoUser.firstName = userInfo.firstName;
         if (!mongoUser.lastName) mongoUser.lastName = userInfo.lastName;

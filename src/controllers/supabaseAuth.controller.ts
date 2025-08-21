@@ -32,7 +32,12 @@ class SupabaseAuthController {
       const profilePhoto = user_metadata?.picture || user_metadata?.avatar_url || '';
       
       // LinkedIn veya diğer sağlayıcı kontrolü
-      const authProvider = provider || 'supabase';
+      let authProvider = provider || 'email';
+      
+      // linkedin_oidc'i linkedin olarak normalize et
+      if (authProvider === 'linkedin_oidc') {
+        authProvider = 'linkedin';
+      }
       
       console.log('Çıkarılan kullanıcı bilgileri:', {
         firstName,
@@ -68,7 +73,7 @@ class SupabaseAuthController {
           supabaseMetadata: user_metadata,
           emailVerified: user_metadata?.email_verified || false,
           // LinkedIn ID varsa ekle
-          linkedinId: authProvider === 'linkedin_oidc' || authProvider === 'linkedin' ? 
+          linkedinId: authProvider === 'linkedin' ? 
             user_metadata?.sub || user_metadata?.id || null : null,
           lastLogin: new Date()
         });
@@ -82,6 +87,9 @@ class SupabaseAuthController {
         user.lastLogin = new Date();
         user.supabaseId = supabase_user_id;
         
+        // Her girişte authProvider'ı güncelle
+        user.authProvider = authProvider;
+        
         if (!user.firstName && firstName) {
           user.firstName = firstName;
         }
@@ -93,8 +101,7 @@ class SupabaseAuthController {
         }
         
         // LinkedIn giriş ise linkedinId'yi güncelle
-        if ((authProvider === 'linkedin_oidc' || authProvider === 'linkedin') && 
-            (user_metadata?.sub || user_metadata?.id)) {
+        if (authProvider === 'linkedin' && (user_metadata?.sub || user_metadata?.id)) {
           user.linkedinId = user_metadata?.sub || user_metadata?.id;
         }
         

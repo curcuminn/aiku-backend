@@ -65,16 +65,14 @@ passport.use(
           console.log('[GoogleStrategy] Yeni kullanıcı oluşturuldu:', { userId: user._id });
         } else {
           console.log('[GoogleStrategy] Mevcut kullanıcı bulundu:', { userId: user._id });
-          // Eğer kullanıcı var ama Google ile giriş yapmıyorsa güncelle
-          if (user.authProvider !== 'google' || !user.googleId) {
-            user.authProvider = 'google';
-            user.googleId = profile.id;
-            if (profile.photos?.[0]?.value && !user.profilePhoto) {
-              user.profilePhoto = profile.photos[0].value;
-            }
-            await user.save();
-            console.log('[GoogleStrategy] Kullanıcı auth provider Google olarak güncellendi');
+          // Her Google girişinde authProvider'ı güncelle
+          user.authProvider = 'google';
+          user.googleId = profile.id;
+          if (profile.photos?.[0]?.value && !user.profilePhoto) {
+            user.profilePhoto = profile.photos[0].value;
           }
+          await user.save();
+          console.log('[GoogleStrategy] Kullanıcı auth provider Google olarak güncellendi');
         }
 
         return done(null, user);

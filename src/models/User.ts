@@ -167,7 +167,7 @@ const userSchema = new Schema<IUser>({
   },
   authProvider: {
     type: String,
-    enum: ['email', 'linkedin', 'google', 'supabase'],
+    enum: ['email', 'linkedin', 'google'],
     default: 'email'
   },
   googleId: {
