@@ -1715,10 +1715,10 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
       });
     }
 
-    // Kullanıcıyı bul
+    // Kullanıcıyı bul - select: false alanları da getir
     const user = await User.findOne({ 
       email: email.toLowerCase().trim() 
-    });
+    }).select('+mobileVerificationCode +mobileVerificationExpires');
 
     if (!user) {
       return res.status(404).json({
