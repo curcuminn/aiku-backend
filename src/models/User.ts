@@ -239,11 +239,6 @@ const userSchema = new Schema<IUser>({
     select: false
   },
   // Şifre sıfırlama kodları
-  passwordResetCode: {
-    type: String,
-    select: false
-  },
-  // Şifre sıfırlama kodları
   passwordResetToken: {
     type: String,
     select: false
