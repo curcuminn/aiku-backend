@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 
 export const getPushNotificationSettings = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as IUser)?._id;
     
     if (!userId) {
       return res.status(401).json({
@@ -39,7 +39,7 @@ export const getPushNotificationSettings = async (req: Request, res: Response) =
 
 export const updatePushNotificationSettings = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as IUser)?._id;
     const { pushNotificationsEnabled } = req.body;
     
     if (!userId) {
@@ -88,7 +88,7 @@ export const updatePushNotificationSettings = async (req: Request, res: Response
 
 export const getAllNotificationSettings = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as IUser)?._id;
     
     if (!userId) {
       return res.status(401).json({

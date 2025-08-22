@@ -1,5 +1,5 @@
 import express from 'express';
-import { auth } from '../middleware/auth';
+import { protect } from '../middleware/auth';
 import {
   getPushNotificationSettings,
   updatePushNotificationSettings,
@@ -9,12 +9,12 @@ import {
 const router = express.Router();
 
 // Push notification ayarlarını getir
-router.get('/push-settings', auth, getPushNotificationSettings);
+router.get('/push-settings', protect, getPushNotificationSettings);
 
 // Push notification ayarlarını güncelle
-router.put('/push-settings', auth, updatePushNotificationSettings);
+router.put('/push-settings', protect, updatePushNotificationSettings);
 
 // Tüm notification ayarlarını getir
-router.get('/all-settings', auth, getAllNotificationSettings);
+router.get('/all-settings', protect, getAllNotificationSettings);
 
 export default router;
