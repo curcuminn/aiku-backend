@@ -86,7 +86,7 @@ class BrevoService {
     async sendMobileVerificationCode(email: string, code: string, expiresInMinutes: number): Promise<void> {
         const sendSmtpEmail = {
             to: [{ email }],
-            templateId: 2, // <-- Email change template'ini kullan (aynı parametreler)
+            templateId: 13,
             params: {
                 code,
                 expires: expiresInMinutes,
@@ -109,7 +109,7 @@ class BrevoService {
     async sendPasswordResetCode(email: string, code: string, expiresInMinutes: number): Promise<void> {
         const sendSmtpEmail = {
             to: [{ email }],
-            templateId: 2, // <-- Email change template'ini kullan (aynı parametreler)
+            templateId: 14,
             params: {
                 code,
                 expires: expiresInMinutes,
