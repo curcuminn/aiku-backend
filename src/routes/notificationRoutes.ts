@@ -3,7 +3,10 @@ import { protect } from '../middleware/auth';
 import {
   getPushNotificationSettings,
   updatePushNotificationSettings,
-  getAllNotificationSettings
+  getAllNotificationSettings,
+  savePushToken,
+  deletePushToken,
+  sendTestPushNotification
 } from '../controllers/notificationController';
 
 const router = express.Router();
@@ -16,5 +19,14 @@ router.put('/push-settings', protect, updatePushNotificationSettings);
 
 // Tüm notification ayarlarını getir
 router.get('/all-settings', protect, getAllNotificationSettings);
+
+// Push token kaydet
+router.post('/push-tokens', protect, savePushToken);
+
+// Push token sil
+router.delete('/push-tokens', protect, deletePushToken);
+
+// Test push notification gönder
+router.post('/test-push', protect, sendTestPushNotification);
 
 export default router;

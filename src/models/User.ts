@@ -83,6 +83,13 @@ export interface IUser extends Document {
   lastSeen?: Date;
   acceptChatNotification: boolean;
   pushNotificationsEnabled: boolean;
+  pushTokens?: Array<{
+    playerId: string;
+    pushToken: string;
+    platform: 'ios' | 'android';
+    deviceId?: string;
+    lastUpdated: Date;
+  }>;
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
   processPayment(): Promise<{
@@ -406,6 +413,24 @@ const userSchema = new Schema<IUser>(
     pushNotificationsEnabled: {
       type: Boolean,
       default: true,
+    },
+    // OneSignal push token alanları
+    pushTokens: {
+      type: [{
+        playerId: String,
+        pushToken: String,
+        platform: {
+          type: String,
+          enum: ['ios', 'android'],
+          required: true
+        },
+        deviceId: String,
+        lastUpdated: {
+          type: Date,
+          default: Date.now
+        }
+      }],
+      default: []
     },
     role: {
       type: String,
