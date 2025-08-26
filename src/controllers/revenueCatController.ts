@@ -26,12 +26,20 @@ export const handleRevenueCatWebhook = async (
       }
     }
 
+    // Webhook body'sini kontrol et
+    const webhookBody = req.body;
+    
+    if (!webhookBody) {
+      logger.error('RevenueCat webhook body boş');
+      return res.status(400).json({ error: 'Empty webhook body' });
+    }
+
     // Webhook event'ini işle
-    const result = await revenueCatService.handleWebhook(req.body);
+    const result = await revenueCatService.handleWebhook(webhookBody);
     
     if (result.success) {
       logger.info('RevenueCat webhook başarıyla işlendi', {
-        eventType: req.body.event?.type
+        eventType: webhookBody.event?.type || 'signed_payload'
       });
       res.status(200).json({ success: true });
     } else {
@@ -287,8 +295,21 @@ export const syncRevenueCatId = async (
       });
     }
 
-    // Kullanıcıyı bul
-    const user = await User.findById(userId);
+    // Kullanıcıyı bul - hem string hem ObjectId formatını destekle
+    let user;
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      // Geçerli ObjectId formatı
+      user = await User.findById(userId);
+    } else {
+      // String format - email veya başka bir identifier
+      user = await User.findOne({ 
+        $or: [
+          { email: userId },
+          { _id: userId }
+        ]
+      });
+    }
+
     if (!user) {
       return res.status(404).json({
         success: false,

@@ -48,9 +48,35 @@ class RevenueCatService {
   /**
    * RevenueCat webhook'larını işler
    */
-  async handleWebhook(event: RevenueCatWebhookEvent) {
+  async handleWebhook(event: RevenueCatWebhookEvent | { signedPayload: string }) {
     try {
-      const { event: webhookEvent } = event;
+      let webhookEvent: any;
+      
+      // Signed payload kontrolü
+      if ('signedPayload' in event) {
+        try {
+          // Signed payload'ı decode et (basit base64 decode)
+          const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
+          const payloadData = JSON.parse(decodedPayload);
+          webhookEvent = payloadData.event;
+          
+          logger.info('Signed payload decode edildi', {
+            eventType: webhookEvent?.type,
+            appUserId: webhookEvent?.app_user_id
+          });
+        } catch (decodeError) {
+          logger.error('Signed payload decode hatası', { error: decodeError });
+          return { success: false, error: 'Invalid signed payload' };
+        }
+      } else {
+        webhookEvent = event.event;
+      }
+
+      // Event kontrolü
+      if (!webhookEvent || !webhookEvent.type) {
+        logger.error('Geçersiz webhook event', { event });
+        return { success: false, error: 'Invalid event structure' };
+      }
       
       logger.info('RevenueCat webhook alındı', {
         eventType: webhookEvent.type,
@@ -408,15 +434,32 @@ class RevenueCatService {
    * RevenueCat app_user_id ile kullanıcıyı bulur
    */
   private async findUserByRevenueCatId(appUserId: string) {
-    // Önce User ID ile dene (RevenueCat'te app_user_id olarak User ID kullanılıyor)
-    let user = await User.findById(appUserId);
-    
-    if (!user) {
-      // Eğer User ID ile bulunamazsa, revenueCatId field'ı ile dene
-      user = await User.findOne({ 'revenueCatId': appUserId });
+    try {
+      // Önce revenueCatId field'ı ile dene
+      let user = await User.findOne({ 'revenueCatId': appUserId });
+      
+      if (!user) {
+        // Eğer revenueCatId ile bulunamazsa, User ID ile dene (sadece geçerli ObjectId ise)
+        if (appUserId.match(/^[0-9a-fA-F]{24}$/)) {
+          user = await User.findById(appUserId);
+        }
+      }
+      
+      if (!user) {
+        // Son olarak email ile dene (eğer app_user_id email formatında ise)
+        if (appUserId.includes('@')) {
+          user = await User.findOne({ 'email': appUserId });
+        }
+      }
+      
+      return user;
+    } catch (error: any) {
+      logger.error('Kullanıcı arama hatası', { 
+        appUserId, 
+        error: error.message 
+      });
+      return null;
     }
-    
-    return user;
   }
 
   /**
