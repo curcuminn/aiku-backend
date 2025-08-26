@@ -8,7 +8,8 @@ import {
   testWebhook,
   syncRevenueCatId,
   createTestUser,
-  getTestUser
+  getTestUser,
+  testUserWebhook
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -26,6 +27,12 @@ router.post('/webhook', handleRevenueCatWebhook);
  * GET /api/revenuecat/test-webhook
  */
 router.get('/test-webhook', testWebhook);
+
+/**
+ * Test user webhook endpoint (bu kullanıcı için)
+ * GET /api/revenuecat/test-user-webhook
+ */
+router.get('/test-user-webhook', testUserWebhook);
 
 /**
  * RevenueCat ID senkronizasyon endpoint'i

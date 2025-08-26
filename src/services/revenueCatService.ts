@@ -155,6 +155,9 @@ class RevenueCatService {
       const now = new Date();
       const purchaseDate = new Date(event.purchased_at_ms);
 
+      // Eğer kullanıcının aboneliği iptal edilmişse, yeni abonelik olarak işle
+      const isReactivation = user.subscriptionStatus === 'cancelled' || user.subscriptionStatus === 'expired';
+      
       // Abonelik bilgilerini güncelle
       user.subscriptionPlan = productConfig.plan;
       user.subscriptionPeriod = productConfig.period;
@@ -163,16 +166,18 @@ class RevenueCatService {
       user.autoRenewal = true;
       user.lastPaymentDate = purchaseDate;
 
-      // Trial kontrolü
-      if (productConfig.trialDays > 0) {
+      // Trial kontrolü - sadece ilk kez abonelik alan kullanıcılar için
+      if (productConfig.trialDays > 0 && !isReactivation) {
         user.subscriptionStatus = 'trial';
         const trialEndDate = new Date(purchaseDate);
         trialEndDate.setDate(trialEndDate.getDate() + productConfig.trialDays);
         user.trialEndsAt = trialEndDate;
         user.nextPaymentDate = trialEndDate;
       } else {
+        // Yeniden aktivasyon veya trial olmayan planlar için
         user.subscriptionStatus = 'active';
         user.subscriptionStartDate = purchaseDate;
+        user.trialEndsAt = undefined; // Trial'ı kaldır
         
         // Bir sonraki ödeme tarihini hesapla
         const nextPaymentDate = new Date(purchaseDate);
@@ -195,7 +200,9 @@ class RevenueCatService {
         date: purchaseDate,
         status: 'success',
         transactionId: event.transaction_id,
-        description: `IAP ${productConfig.plan} ${productConfig.period} abonelik`,
+        description: isReactivation 
+          ? `IAP ${productConfig.plan} ${productConfig.period} yeniden aktivasyon`
+          : `IAP ${productConfig.plan} ${productConfig.period} abonelik`,
         type: 'subscription',
         plan: productConfig.plan,
         period: productConfig.period,
@@ -208,7 +215,9 @@ class RevenueCatService {
       logger.info('IAP ilk satın alma başarıyla işlendi', {
         userId: user._id,
         plan: productConfig.plan,
-        period: productConfig.period
+        period: productConfig.period,
+        isReactivation,
+        previousStatus: user.subscriptionStatus
       });
 
       return { success: true };

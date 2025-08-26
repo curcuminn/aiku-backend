@@ -194,6 +194,64 @@ export const testWebhook = async (
 };
 
 /**
+ * Test için özel webhook endpoint'i - bu kullanıcı için
+ */
+export const testUserWebhook = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    // Test event'i oluştur - bu kullanıcı için
+    const testEvent = {
+      api_version: '1.0',
+      event: {
+        type: 'INITIAL_PURCHASE',
+        id: 'test-reactivation-event',
+        app_user_id: '$RCAnonymousID:ad32e482d520486ea6cc28d5afa44dae',
+        product_id: 'startup_monthly',
+        period_type: 'NORMAL',
+        purchased_at_ms: Date.now(),
+        expiration_at_ms: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 gün sonra
+        environment: 'SANDBOX',
+        entitlement_id: null,
+        entitlement_ids: ['startup_access'],
+        presented_offering_id: 'default',
+        transaction_id: 'test-transaction-' + Date.now(),
+        original_transaction_id: 'test-transaction-' + Date.now(),
+        is_family_share: false,
+        country_code: 'TR',
+        aliases: [],
+        original_app_user_id: '$RCAnonymousID:ad32e482d520486ea6cc28d5afa44dae',
+        currency: 'TRY',
+        price: 49,
+        price_in_purchased_currency: 49,
+        subscriber_attributes: {},
+        store: 'APP_STORE',
+        takehome_percentage: 0.7,
+        offer_code: null,
+        tax_percentage: 0.18,
+        commission_percentage: 0.3,
+        metadata: null,
+        renewal_number: null,
+        app_id: 'app032bc355d3'
+      }
+    };
+
+    const result = await revenueCatService.handleWebhook(testEvent);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Test webhook processed',
+      result,
+      testEvent
+    });
+  } catch (error: any) {
+    logger.error('Test user webhook hatası', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
  * Mobil uygulama için abonelik planlarını döndürür
  */
 export const getMobileSubscriptionPlans = async (
