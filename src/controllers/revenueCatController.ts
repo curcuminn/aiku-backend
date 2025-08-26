@@ -776,3 +776,197 @@ export const cancelAllSubscriptions = async (
     });
   }
 };
+
+/**
+ * Aboneliğin auto-renewal durumunu değiştirir (toggle)
+ */
+export const toggleSubscriptionRenewal = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Oturum açmanız gerekiyor',
+      });
+    }
+
+    const { subscriptionId } = req.params;
+    
+    if (!subscriptionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'subscriptionId gerekli'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // Aboneliği bul
+    const subscription = user.subscriptions?.find((sub: any) => sub._id?.toString() === subscriptionId);
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'Abonelik bulunamadı'
+      });
+    }
+
+    if (!subscription.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'İptal edilmiş aboneliklerin auto-renewal durumu değiştirilemez'
+      });
+    }
+
+    // Auto-renewal durumunu tersine çevir
+    const newRenewalStatus = !subscription.autoRenewal;
+    subscription.autoRenewal = newRenewalStatus;
+
+    // Eğer bu aktif abonelikse, ana abonelik bilgilerini de güncelle
+    if (user.subscriptionPlan === subscription.plan && 
+        user.subscriptionPeriod === subscription.period) {
+      user.autoRenewal = newRenewalStatus;
+    }
+
+    await user.save();
+
+    logger.info('Abonelik auto-renewal durumu değiştirildi', {
+      userId: user._id,
+      subscriptionId,
+      plan: subscription.plan,
+      period: subscription.period,
+      newRenewalStatus
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Auto-renewal ${newRenewalStatus ? 'açıldı' : 'kapatıldı'}`,
+      subscription: {
+        id: subscription._id?.toString() || subscriptionId,
+        plan: subscription.plan,
+        period: subscription.period,
+        autoRenewal: subscription.autoRenewal,
+        status: subscription.status
+      }
+    });
+  } catch (error: any) {
+    logger.error('Abonelik auto-renewal değiştirme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Auto-renewal durumu değiştirilemedi',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Aboneliğin auto-renewal durumunu belirli bir değere ayarlar
+ */
+export const updateSubscriptionRenewal = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Oturum açmanız gerekiyor',
+      });
+    }
+
+    const { subscriptionId } = req.params;
+    const { autoRenewal } = req.body;
+    
+    if (!subscriptionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'subscriptionId gerekli'
+      });
+    }
+
+    if (typeof autoRenewal !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'autoRenewal boolean değer olmalı'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // Aboneliği bul
+    const subscription = user.subscriptions?.find((sub: any) => sub._id?.toString() === subscriptionId);
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'Abonelik bulunamadı'
+      });
+    }
+
+    if (!subscription.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'İptal edilmiş aboneliklerin auto-renewal durumu değiştirilemez'
+      });
+    }
+
+    // Auto-renewal durumunu güncelle
+    const oldRenewalStatus = subscription.autoRenewal;
+    subscription.autoRenewal = autoRenewal;
+
+    // Eğer bu aktif abonelikse, ana abonelik bilgilerini de güncelle
+    if (user.subscriptionPlan === subscription.plan && 
+        user.subscriptionPeriod === subscription.period) {
+      user.autoRenewal = autoRenewal;
+    }
+
+    await user.save();
+
+    logger.info('Abonelik auto-renewal durumu güncellendi', {
+      userId: user._id,
+      subscriptionId,
+      plan: subscription.plan,
+      period: subscription.period,
+      oldRenewalStatus,
+      newRenewalStatus: autoRenewal
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Auto-renewal ${autoRenewal ? 'açıldı' : 'kapatıldı'}`,
+      subscription: {
+        id: subscription._id?.toString() || subscriptionId,
+        plan: subscription.plan,
+        period: subscription.period,
+        autoRenewal: subscription.autoRenewal,
+        status: subscription.status,
+        previousAutoRenewal: oldRenewalStatus
+      }
+    });
+  } catch (error: any) {
+    logger.error('Abonelik auto-renewal güncelleme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Auto-renewal durumu güncellenemedi',
+      error: error.message
+    });
+  }
+};

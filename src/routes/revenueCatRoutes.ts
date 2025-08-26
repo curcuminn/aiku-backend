@@ -12,7 +12,9 @@ import {
   testUserWebhook,
   getUserSubscriptions,
   cancelSubscription,
-  cancelAllSubscriptions
+  cancelAllSubscriptions,
+  toggleSubscriptionRenewal,
+  updateSubscriptionRenewal
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -96,5 +98,17 @@ router.delete('/subscriptions/:subscriptionId', protect, cancelSubscription);
  * DELETE /api/revenuecat/subscriptions
  */
 router.delete('/subscriptions', protect, cancelAllSubscriptions);
+
+/**
+ * Aboneliğin auto-renewal durumunu değiştirir (toggle)
+ * PATCH /api/revenuecat/subscriptions/:subscriptionId/renewal/toggle
+ */
+router.patch('/subscriptions/:subscriptionId/renewal/toggle', protect, toggleSubscriptionRenewal);
+
+/**
+ * Aboneliğin auto-renewal durumunu belirli bir değere ayarlar
+ * PATCH /api/revenuecat/subscriptions/:subscriptionId/renewal
+ */
+router.patch('/subscriptions/:subscriptionId/renewal', protect, updateSubscriptionRenewal);
 
 export default router;
