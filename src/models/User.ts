@@ -606,9 +606,9 @@ userSchema.pre("save", function (next) {
     if (this.subscriptions && this.subscriptions.length > 0) {
       const now = new Date();
       const activeSubscription = this.subscriptions.find(sub => {
-        // Eğer status cancelled ise, endDate'e bak
+        // Eğer status cancelled ise, nextPaymentDate'e bak
         if (sub.status === "cancelled") {
-          return sub.endDate && now < sub.endDate;
+          return sub.nextPaymentDate && now < sub.nextPaymentDate;
         }
         // Diğer durumlar için status'a bak
         return sub.status === "active" || sub.status === "trial";

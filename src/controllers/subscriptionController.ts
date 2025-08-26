@@ -64,7 +64,7 @@ export const getUserSubscription = async (
     const activeSubscription = user.subscriptions?.find(sub => {
       const now = new Date();
       if (sub.status === "cancelled") {
-        return sub.endDate && now < sub.endDate;
+        return sub.nextPaymentDate && now < sub.nextPaymentDate;
       }
       return sub.status === "active" || sub.status === "trial";
     });
@@ -550,11 +550,11 @@ export const cancelSpecificSubscription = async (
       });
     }
 
-    // Aboneliği iptal et ama endDate'i koru
+    // Aboneliği iptal et ama nextPaymentDate'i koru
     activeSubscription.status = "cancelled";
     activeSubscription.autoRenewal = false;
-    // isActive'i endDate'e göre hesapla
-    activeSubscription.isActive = new Date() < activeSubscription.endDate;
+    // isActive'i nextPaymentDate'e göre hesapla
+    activeSubscription.isActive = new Date() < activeSubscription.nextPaymentDate;
 
     // Ana subscription alanlarını da güncelle
     user.subscriptionStatus = "cancelled";
@@ -611,6 +611,7 @@ export const getAllSubscriptions = async (
       user.subscriptions.forEach(subscription => {
         subscription.isActive = calculateSubscriptionActive(subscription);
       });
+      await user.save(); // Değişiklikleri kaydet
     }
 
     res.status(200).json({
@@ -636,9 +637,9 @@ export const getAllSubscriptions = async (
 function calculateSubscriptionActive(subscription: any): boolean {
   const now = new Date();
   
-  // Eğer status cancelled ise, endDate'e bak
+  // Eğer status cancelled ise, nextPaymentDate'e bak
   if (subscription.status === "cancelled") {
-    return now < subscription.endDate;
+    return subscription.nextPaymentDate && now < subscription.nextPaymentDate;
   }
   
   // Diğer durumlar için status'a bak
@@ -731,6 +732,75 @@ export const updateExistingSubscriptions = async (
     res.status(500).json({
       success: false,
       message: "Abonelik güncellenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Mevcut aboneliğin isActive durumunu düzeltir
+ */
+export const fixSubscriptionActiveStatus = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    if (!user.subscriptions || user.subscriptions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Abonelik bulunamadı",
+      });
+    }
+
+    // Her aboneliğin isActive durumunu düzelt
+    let updated = false;
+    user.subscriptions.forEach(subscription => {
+      const now = new Date();
+      const shouldBeActive = subscription.status === "cancelled" 
+        ? (subscription.nextPaymentDate && now < subscription.nextPaymentDate)
+        : (subscription.status === "active" || subscription.status === "trial");
+      
+      if (subscription.isActive !== shouldBeActive) {
+        subscription.isActive = shouldBeActive;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Abonelik durumu düzeltildi",
+      data: {
+        subscriptions: user.subscriptions,
+        isSubscriptionActive: user.isSubscriptionActive,
+      },
+    });
+  } catch (error: any) {
+    console.error("Abonelik düzeltme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Abonelik düzeltilirken bir hata oluştu",
       error: error.message,
     });
   }

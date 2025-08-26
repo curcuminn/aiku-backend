@@ -10,7 +10,8 @@ import {
   createSubscription,
   cancelSpecificSubscription,
   getAllSubscriptions,
-  updateExistingSubscriptions
+  updateExistingSubscriptions,
+  fixSubscriptionActiveStatus
 } from '../controllers/subscriptionController';
 
 const router = express.Router();
@@ -84,5 +85,12 @@ router.get('/all', protect, getAllSubscriptions);
  * @access  Private
  */
 router.post('/update-existing', protect, updateExistingSubscriptions);
+
+/**
+ * @route   POST /api/subscriptions/fix-active-status
+ * @desc    Mevcut aboneliğin isActive durumunu düzeltir
+ * @access  Private
+ */
+router.post('/fix-active-status', protect, fixSubscriptionActiveStatus);
 
 export default router; 
