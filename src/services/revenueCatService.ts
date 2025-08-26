@@ -53,81 +53,28 @@ class RevenueCatService {
     try {
       let webhookEvent: any;
       
-      // Signed payload kontrolü
+      // Signed payload kontrolü - Şimdilik ignore et, sadece normal event formatını kullan
       if ('signedPayload' in event) {
-        try {
-          logger.info('Signed payload alındı, decode ediliyor...', {
-            payloadLength: event.signedPayload.length
+        logger.warn('Signed payload alındı ama ignore ediliyor - normal event formatı tercih ediliyor');
+        
+        // Signed payload'ı ignore et ve normal event formatını dene
+        if ('event' in event) {
+          webhookEvent = event.event;
+          logger.info('Normal event formatı kullanılıyor (signed payload ignore edildi)', {
+            eventType: webhookEvent?.type
           });
-          
-          // RevenueCat signed payload'ı JWT formatında gelir
-          // Önce base64 decode et, sonra JWT verify et
-          const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
-          logger.info('Decoded payload başlangıcı:', { 
-            decodedStart: decodedPayload.substring(0, 200) + '...',
-            payloadLength: decodedPayload.length,
-            isJWT: decodedPayload.includes('.') && decodedPayload.split('.').length === 3
-          });
-          
-          // JWT verify et (RevenueCat webhook secret ile)
-          const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
-          
-          if (!webhookSecret) {
-            logger.warn('REVENUECAT_WEBHOOK_SECRET bulunamadı, signed payload decode edilemiyor');
-            // Secret yoksa signed payload'ı raw olarak parse etmeyi dene
-            try {
-              const rawPayload = JSON.parse(decodedPayload);
-              webhookEvent = rawPayload.event;
-              logger.info('Raw payload parse edildi (secret yok)', {
-                eventType: webhookEvent?.type
-              });
-            } catch (parseError) {
-              logger.error('Raw payload parse hatası', { error: parseError });
-              return { success: false, error: 'Cannot parse signed payload without secret' };
-            }
-          } else {
-            // JWT verify et
-            try {
-              const verifiedPayload = verify(decodedPayload, webhookSecret) as any;
-              webhookEvent = verifiedPayload.event;
-              logger.info('JWT verify başarılı', {
-                eventType: webhookEvent?.type
-              });
-            } catch (jwtError) {
-              logger.error('JWT verify hatası, raw parse deneniyor', { error: jwtError });
-              // JWT verify başarısız olursa raw parse dene
-              try {
-                const rawPayload = JSON.parse(decodedPayload);
-                webhookEvent = rawPayload.event;
-                logger.info('Raw payload parse edildi (JWT verify başarısız)', {
-                  eventType: webhookEvent?.type
-                });
-              } catch (parseError) {
-                logger.error('Raw payload parse de başarısız', { error: parseError });
-                return { success: false, error: 'Cannot verify or parse signed payload' };
-              }
-            }
-          }
-          
-          logger.info('Signed payload başarıyla decode edildi', {
-            eventType: webhookEvent?.type,
-            appUserId: webhookEvent?.app_user_id,
-            productId: webhookEvent?.product_id
-          });
-        } catch (decodeError: any) {
-          logger.error('Signed payload decode hatası', { 
-            error: decodeError.message,
-            payloadLength: event.signedPayload.length
-          });
-          
-          // Signed payload decode başarısız olursa, normal event formatını dene
-          if ('event' in event) {
-            webhookEvent = event.event;
-            logger.info('Normal event formatı kullanılıyor', {
+        } else {
+          // Eğer normal event yoksa, signed payload'ı raw parse etmeyi dene
+          try {
+            const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
+            const rawPayload = JSON.parse(decodedPayload);
+            webhookEvent = rawPayload.event;
+            logger.info('Signed payload raw parse edildi', {
               eventType: webhookEvent?.type
             });
-          } else {
-            return { success: false, error: 'Invalid signed payload and no fallback event' };
+          } catch (parseError) {
+            logger.error('Signed payload parse hatası', { error: parseError });
+            return { success: false, error: 'Cannot parse signed payload' };
           }
         }
       } else {
@@ -433,7 +380,7 @@ class RevenueCatService {
   }
 
   /**
-   * Ürün değişikliği işlemini işler
+   * Ürün değişikliği işlemini işler - Her plan değişikliği yeni abonelik olarak sayılır
    */
   private async handleProductChange(user: any, event: any) {
     try {
@@ -442,17 +389,51 @@ class RevenueCatService {
         throw new Error(`Product config not found for: ${event.product_id}`);
       }
 
+      const changeDate = new Date(event.purchased_at_ms);
+      const previousPlan = user.subscriptionPlan;
+      const previousPeriod = user.subscriptionPeriod;
+
       // Abonelik planını güncelle
       user.subscriptionPlan = productConfig.plan;
       user.subscriptionPeriod = productConfig.period;
       user.subscriptionAmount = productConfig.price;
+      user.lastPaymentDate = changeDate;
+      user.isSubscriptionActive = true;
+
+      // Bir sonraki ödeme tarihini hesapla
+      const nextPaymentDate = new Date(changeDate);
+      if (productConfig.period === 'monthly') {
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+      } else {
+        const extraMonths = (productConfig.plan === 'business' || productConfig.plan === 'investor') ? 3 : 0;
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + extraMonths);
+      }
+      user.nextPaymentDate = nextPaymentDate;
+
+      // Ödeme geçmişine yeni abonelik olarak ekle
+      if (!user.paymentHistory) user.paymentHistory = [];
+      user.paymentHistory.push({
+        amount: productConfig.price,
+        date: changeDate,
+        status: 'success',
+        transactionId: event.transaction_id,
+        description: `IAP ${productConfig.plan} ${productConfig.period} abonelik (${previousPlan} ${previousPeriod} → ${productConfig.plan} ${productConfig.period})`,
+        type: 'subscription',
+        plan: productConfig.plan,
+        period: productConfig.period,
+        platform: event.store,
+        iapTransactionId: event.transaction_id
+      });
 
       await user.save();
 
-      logger.info('IAP ürün değişikliği işlendi', {
+      logger.info('IAP ürün değişikliği işlendi - Yeni abonelik olarak kaydedildi', {
         userId: user._id,
+        previousPlan,
+        previousPeriod,
         newPlan: productConfig.plan,
-        newPeriod: productConfig.period
+        newPeriod: productConfig.period,
+        transactionId: event.transaction_id
       });
 
       return { success: true };
