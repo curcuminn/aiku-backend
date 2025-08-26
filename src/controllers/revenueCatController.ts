@@ -1054,3 +1054,56 @@ export const updateSubscriptionRenewal = async (
     });
   }
 };
+
+/**
+ * RevenueCat webhook'unu test eder - gerçek webhook verisi ile
+ * Bu endpoint RevenueCat'ten gelen gerçek webhook verisini test eder
+ */
+export const testRealWebhook = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const webhookData = req.body;
+    
+    if (!webhookData || !webhookData.event) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli webhook verisi gerekli'
+      });
+    }
+
+    logger.info('Gerçek webhook test ediliyor', {
+      eventType: webhookData.event.type,
+      appUserId: webhookData.event.app_user_id,
+      productId: webhookData.event.product_id,
+      transactionId: webhookData.event.transaction_id
+    });
+
+    // Webhook'u işle
+    const result = await revenueCatService.handleWebhook(webhookData);
+
+    logger.info('Gerçek webhook test sonucu', {
+      eventType: webhookData.event.type,
+      appUserId: webhookData.event.app_user_id,
+      result: result
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Webhook test başarıyla tamamlandı',
+      data: {
+        eventType: webhookData.event.type,
+        appUserId: webhookData.event.app_user_id,
+        result: result
+      }
+    });
+  } catch (error: any) {
+    logger.error('Gerçek webhook test hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Webhook test hatası',
+      error: error.message
+    });
+  }
+};

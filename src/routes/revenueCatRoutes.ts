@@ -14,7 +14,9 @@ import {
   cancelSubscription,
   cancelAllSubscriptions,
   toggleSubscriptionRenewal,
-  updateSubscriptionRenewal
+  updateSubscriptionRenewal,
+  updateUserRevenueCatId,
+  testRealWebhook
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -110,5 +112,17 @@ router.patch('/subscriptions/:subscriptionId/renewal/toggle', protect, toggleSub
  * PATCH /api/revenuecat/subscriptions/:subscriptionId/renewal
  */
 router.patch('/subscriptions/:subscriptionId/renewal', protect, updateSubscriptionRenewal);
+
+/**
+ * Kullanıcının RevenueCat ID'sini manuel olarak günceller
+ * POST /api/revenuecat/update-user-id
+ */
+router.post('/update-user-id', protect, updateUserRevenueCatId);
+
+/**
+ * Gerçek webhook verisi ile test
+ * POST /api/revenuecat/test-real-webhook
+ */
+router.post('/test-real-webhook', protect, testRealWebhook);
 
 export default router;

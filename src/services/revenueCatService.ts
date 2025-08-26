@@ -267,16 +267,142 @@ class RevenueCatService {
       }
       
       if (!user) {
-        logger.warn('RevenueCat webhook için kullanıcı bulunamadı', {
+        logger.warn('RevenueCat webhook için kullanıcı bulunamadı, akıllı arama yapılıyor', {
           appUserId: appUserId,
           originalAppUserId: webhookEvent.original_app_user_id,
           eventType: webhookEvent.type,
           productId: webhookEvent.product_id
         });
         
-        // Kullanıcı bulunamadığında webhook'u başarılı olarak işaretle
-        // RevenueCat'in tekrar denemesini engelle
-        return { success: true, message: 'User not found, but webhook processed' };
+        // Anonymous ID için özel arama stratejisi
+        if (appUserId.startsWith('$RCAnonymousID:')) {
+          logger.info('Anonymous ID için özel arama yapılıyor', { appUserId });
+          
+          // 1. Önce RevenueCat API'den kullanıcı bilgilerini al
+          try {
+            const userInfo = await this.getUserInfo(appUserId);
+            logger.info('RevenueCat API\'den kullanıcı bilgisi alındı', {
+              appUserId,
+              originalAppUserId: userInfo.original_app_user_id,
+              entitlements: userInfo.entitlements,
+              subscriptions: userInfo.subscriptions
+            });
+            
+            // 2. Original app user ID ile arama yap
+            if (userInfo.original_app_user_id && userInfo.original_app_user_id !== appUserId) {
+              user = await this.findUserByRevenueCatId(userInfo.original_app_user_id);
+              if (user) {
+                logger.info('Original app user ID ile kullanıcı bulundu', {
+                  originalId: userInfo.original_app_user_id,
+                  userId: user._id,
+                  userEmail: user.email
+                });
+              }
+            }
+            
+            // 3. Hala bulunamazsa, son 24 saat içinde oluşturulan kullanıcıları kontrol et
+            if (!user) {
+              const oneDayAgo = new Date();
+              oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+              
+              const recentUsers = await User.find({
+                createdAt: { $gte: oneDayAgo },
+                revenueCatId: { $exists: false }
+              }).sort({ createdAt: -1 }).limit(10);
+              
+              logger.info('Son 24 saatte oluşturulan kullanıcılar kontrol ediliyor', {
+                recentUsersCount: recentUsers.length,
+                users: recentUsers.map(u => ({
+                  id: u._id,
+                  email: u.email,
+                  createdAt: u.createdAt
+                }))
+              });
+              
+              // En son oluşturulan kullanıcıyı seç (muhtemelen abonelik alan kullanıcı)
+              if (recentUsers.length > 0) {
+                user = recentUsers[0];
+                logger.info('En son oluşturulan kullanıcı seçildi', {
+                  userId: user._id,
+                  userEmail: user.email,
+                  createdAt: user.createdAt
+                });
+              }
+            }
+            
+          } catch (apiError: any) {
+            logger.warn('RevenueCat API\'den bilgi alınamadı', { 
+              appUserId, 
+              error: apiError.message 
+            });
+          }
+        }
+        
+        // Hala kullanıcı bulunamazsa, daha geniş arama yap
+        if (!user) {
+          logger.info('Geniş arama yapılıyor - son 7 günde oluşturulan kullanıcılar kontrol ediliyor');
+          
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          
+          const recentUsers = await User.find({
+            createdAt: { $gte: oneWeekAgo },
+            revenueCatId: { $exists: false }
+          }).sort({ createdAt: -1 }).limit(20);
+          
+          logger.info('Son 7 günde oluşturulan kullanıcılar', {
+            recentUsersCount: recentUsers.length,
+            users: recentUsers.map(u => ({
+              id: u._id,
+              email: u.email,
+              createdAt: u.createdAt,
+              subscriptionStatus: u.subscriptionStatus
+            }))
+          });
+          
+          // Abonelik durumu olmayan en son kullanıcıyı seç
+          const potentialUser = recentUsers.find(u => !u.subscriptionStatus || u.subscriptionStatus === 'active');
+          if (potentialUser) {
+            user = potentialUser;
+            logger.info('Potansiyel kullanıcı seçildi', {
+              userId: user._id,
+              userEmail: user.email,
+              createdAt: user.createdAt,
+              subscriptionStatus: user.subscriptionStatus
+            });
+          }
+        }
+        
+        // Hala kullanıcı bulunamazsa
+        if (!user) {
+          logger.error('RevenueCat webhook için kullanıcı bulunamadı - webhook işlenemiyor', {
+            appUserId: appUserId,
+            originalAppUserId: webhookEvent.original_app_user_id,
+            eventType: webhookEvent.type,
+            productId: webhookEvent.product_id
+          });
+          
+          // Kullanıcı bulunamadığında webhook'u başarılı olarak işaretle
+          // RevenueCat'in tekrar denemesini engelle
+          return { success: true, message: 'User not found, but webhook processed' };
+        }
+        
+        // Kullanıcı bulundu, RevenueCat ID'sini kaydet
+        if (user && !user.revenueCatId) {
+          logger.info('Kullanıcı bulundu, RevenueCat ID kaydediliyor', {
+            userId: user._id,
+            userEmail: user.email,
+            revenueCatId: appUserId
+          });
+          
+          user.revenueCatId = appUserId;
+          await user.save();
+          
+          logger.info('RevenueCat ID başarıyla kaydedildi', {
+            userId: user._id,
+            revenueCatId: user.revenueCatId
+          });
+        }
       }
 
       // Event tipine göre işlem yap
@@ -906,6 +1032,17 @@ class RevenueCatService {
             user = await User.findOne({ 'revenueCatId': userInfo.original_app_user_id });
             if (!user && userInfo.original_app_user_id.match(/^[0-9a-fA-F]{24}$/)) {
               user = await User.findById(userInfo.original_app_user_id);
+            }
+          }
+          
+          // Eğer hala bulunamazsa, subscriber_attributes'den email bilgisi var mı kontrol et
+          if (!user && userInfo.subscriber_attributes) {
+            const emailAttr = userInfo.subscriber_attributes.$email;
+            if (emailAttr && emailAttr.value) {
+              logger.info('RevenueCat subscriber_attributes\'den email bulundu', { 
+                email: emailAttr.value 
+              });
+              user = await User.findOne({ 'email': emailAttr.value });
             }
           }
         } catch (apiError: any) {
