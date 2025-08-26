@@ -419,12 +419,38 @@ export const syncRevenueCatId = async (
       });
     }
 
+    // Önce bu RevenueCat ID başka bir user'da var mı kontrol et
+    const existingUser = await User.findOne({
+      revenueCatId: revenueCatId,
+      _id: { $ne: user._id }
+    });
+
+    if (existingUser) {
+      logger.warn('RevenueCat ID başka bir user\'da zaten var!', {
+        newUserId: user._id,
+        newUserEmail: user.email,
+        existingUserId: existingUser._id,
+        existingUserEmail: existingUser.email,
+        revenueCatId
+      });
+
+      // Mevcut user'ın RevenueCat ID'sini temizle
+      existingUser.revenueCatId = undefined;
+      await existingUser.save();
+
+      logger.info('Mevcut user\'ın RevenueCat ID\'si temizlendi', {
+        userId: existingUser._id,
+        email: existingUser.email
+      });
+    }
+
     // RevenueCat ID'yi kaydet
     user.revenueCatId = revenueCatId;
     await user.save();
 
     logger.info('RevenueCat ID senkronize edildi', {
       userId: user._id,
+      userEmail: user.email,
       revenueCatId
     });
 

@@ -189,23 +189,77 @@ class RevenueCatService {
       }
 
       let user = await this.findUserByRevenueCatId(appUserId);
-      
-      // Eğer bulunamazsa ve original_app_user_id varsa, onunla da dene
+
+      logger.info('User lookup result', {
+        appUserId,
+        userFound: !!user,
+        userId: user?._id,
+        userEmail: user?.email,
+        userRevenueCatId: user?.revenueCatId,
+        userSubscriptionCount: user?.subscriptions?.length || 0
+      });
+
+            // Eğer bulunamazsa ve original_app_user_id varsa, onunla da dene
       if (!user && webhookEvent.original_app_user_id && webhookEvent.original_app_user_id !== appUserId) {
         logger.info('Original app user ID ile kullanıcı aranıyor', {
           currentId: appUserId,
           originalId: webhookEvent.original_app_user_id
         });
         user = await this.findUserByRevenueCatId(webhookEvent.original_app_user_id);
-        
+
+        logger.info('Original user lookup result', {
+          originalId: webhookEvent.original_app_user_id,
+          userFound: !!user,
+          userId: user?._id,
+          userEmail: user?.email
+        });
+
                  // Eğer original ID ile bulunursa, yeni ID'yi de kaydet
          if (user) {
+           // ⚠️ DUPLICATE KONTROL - Webhook sırasında da duplicate oluşmasını engelle
+           const existingUserWithNewId = await User.findOne({
+             revenueCatId: appUserId,
+             _id: { $ne: user._id }
+           });
+
+           if (existingUserWithNewId) {
+             logger.warn('Webhook sırasında duplicate RevenueCat ID tespit edildi!', {
+               newUserId: user._id,
+               newUserEmail: user.email,
+               existingUserId: existingUserWithNewId._id,
+               existingUserEmail: existingUserWithNewId.email,
+               revenueCatId: appUserId
+             });
+
+             // Mevcut user'ın RC ID'sini temizle (daha az subscription'ı varsa)
+             const currentSubs = user.subscriptions?.length || 0;
+             const existingSubs = existingUserWithNewId.subscriptions?.length || 0;
+
+             if (currentSubs >= existingSubs) {
+               // Yeni user daha fazla subscription'a sahip, mevcut user'ın ID'sini temizle
+               existingUserWithNewId.revenueCatId = undefined;
+               await existingUserWithNewId.save();
+               logger.info('Mevcut user\'ın RC ID\'si temizlendi (webhook)', {
+                 userId: existingUserWithNewId._id,
+                 email: existingUserWithNewId.email
+               });
+             } else {
+               // Mevcut user daha fazla subscription'a sahip, yeni user'ı kullanma
+               logger.warn('Mevcut user daha fazla subscription\'a sahip, yeni ID ataması yapılmıyor', {
+                 existingUserId: existingUserWithNewId._id,
+                 existingSubs: existingSubs,
+                 newUserSubs: currentSubs
+               });
+               user = existingUserWithNewId; // Mevcut user'ı kullan
+             }
+           }
+
            logger.info('Original ID ile kullanıcı bulundu, yeni ID kaydediliyor', {
              userId: user._id,
              originalId: webhookEvent.original_app_user_id,
              newId: appUserId
            });
-           
+
            // Yeni ID'yi revenueCatId olarak güncelle
            user.revenueCatId = appUserId;
            await user.save();
@@ -566,6 +620,15 @@ class RevenueCatService {
    */
   private async handleProductChange(user: any, event: any) {
     try {
+      logger.info('PRODUCT_CHANGE event başladı', {
+        userId: user._id,
+        userEmail: user.email,
+        userSubscriptionCount: user.subscriptions?.length || 0,
+        eventProductId: event.product_id,
+        eventNewProductId: event.new_product_id,
+        transactionId: event.transaction_id
+      });
+
       // Yeni product ID'yi kullan (new_product_id varsa)
       const newProductId = event.new_product_id || event.product_id;
       const productConfig = this.getProductConfig(newProductId);
@@ -660,6 +723,8 @@ class RevenueCatService {
     try {
       logger.info('DID_CHANGE_RENEWAL_PREF event işleniyor', {
         userId: user._id,
+        userEmail: user.email,
+        userSubscriptionCount: user.subscriptions?.length || 0,
         subtype: event.subtype,
         productId: event.product_id,
         transactionId: event.transaction_id
@@ -781,14 +846,43 @@ class RevenueCatService {
     try {
       // Önce revenueCatId field'ı ile dene
       let user = await User.findOne({ 'revenueCatId': appUserId });
-      
+
+      // ⚠️ DUPLICATE KONTROL - Eğer birden fazla user aynı RC ID'ye sahipse
+      if (user) {
+        const duplicateUsers = await User.find({ 'revenueCatId': appUserId });
+        if (duplicateUsers.length > 1) {
+          logger.error('CRITICAL: Multiple users with same RevenueCat ID found!', {
+            revenueCatId: appUserId,
+            userCount: duplicateUsers.length,
+            users: duplicateUsers.map(u => ({
+              id: u._id,
+              email: u.email,
+              subscriptionCount: u.subscriptions?.length || 0
+            }))
+          });
+
+          // En fazla subscription'ı olan user'ı seç
+          user = duplicateUsers.reduce((best, current) => {
+            const bestSubs = best.subscriptions?.length || 0;
+            const currentSubs = current.subscriptions?.length || 0;
+            return currentSubs > bestSubs ? current : best;
+          });
+
+          logger.info('Selected user with most subscriptions', {
+            selectedUserId: user._id,
+            selectedUserEmail: user.email,
+            subscriptionCount: user.subscriptions?.length || 0
+          });
+        }
+      }
+
       if (!user) {
         // Eğer revenueCatId ile bulunamazsa, User ID ile dene (sadece geçerli ObjectId ise)
         if (appUserId.match(/^[0-9a-fA-F]{24}$/)) {
           user = await User.findById(appUserId);
         }
       }
-      
+
       if (!user) {
         // Son olarak email ile dene (eğer app_user_id email formatında ise)
         if (appUserId.includes('@')) {
