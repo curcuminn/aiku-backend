@@ -218,20 +218,24 @@ export const testUserWebhook = async (
   res: express.Response
 ) => {
   try {
+    const eventType = (req.query.eventType as string) || 'INITIAL_PURCHASE';
+    const productId = (req.query.productId as string) || 'startup_monthly';
+    
     // Test event'i oluştur - bu kullanıcı için
     const testEvent = {
       api_version: '1.0',
       event: {
-        type: 'INITIAL_PURCHASE',
-        id: 'test-reactivation-event',
+        type: eventType,
+        id: 'test-event-' + Date.now(),
         app_user_id: '$RCAnonymousID:ad32e482d520486ea6cc28d5afa44dae',
-        product_id: 'startup_monthly',
+        product_id: productId,
+        new_product_id: eventType === 'PRODUCT_CHANGE' ? 'business_monthly' : undefined,
         period_type: 'NORMAL',
         purchased_at_ms: Date.now(),
         expiration_at_ms: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 gün sonra
         environment: 'SANDBOX',
         entitlement_id: null,
-        entitlement_ids: ['startup_access'],
+        entitlement_ids: eventType === 'PRODUCT_CHANGE' ? ['premium_access', 'startup_access'] : ['startup_access'],
         presented_offering_id: 'default',
         transaction_id: 'test-transaction-' + Date.now(),
         original_transaction_id: 'test-transaction-' + Date.now(),
@@ -240,14 +244,14 @@ export const testUserWebhook = async (
         aliases: [],
         original_app_user_id: '$RCAnonymousID:ad32e482d520486ea6cc28d5afa44dae',
         currency: 'TRY',
-        price: 49,
-        price_in_purchased_currency: 49,
+        price: 0,
+        price_in_purchased_currency: 0,
         subscriber_attributes: {},
         store: 'APP_STORE',
         takehome_percentage: 0.7,
         offer_code: null,
-        tax_percentage: 0.18,
-        commission_percentage: 0.3,
+        tax_percentage: 0.2292,
+        commission_percentage: 0.2312,
         metadata: null,
         renewal_number: null,
         app_id: 'app032bc355d3'
@@ -258,9 +262,13 @@ export const testUserWebhook = async (
     
     res.status(200).json({
       success: true,
-      message: 'Test webhook processed',
+      message: `Test ${eventType} webhook processed`,
       result,
-      testEvent
+      testEvent: {
+        type: eventType,
+        productId: productId,
+        newProductId: eventType === 'PRODUCT_CHANGE' ? 'business_monthly' : undefined
+      }
     });
   } catch (error: any) {
     logger.error('Test user webhook hatası', { error: error.message });
@@ -523,7 +531,9 @@ export const getTestUser = async (
         revenueCatId: user.revenueCatId,
         subscriptionStatus: user.subscriptionStatus,
         subscriptionPlan: user.subscriptionPlan,
-        paymentMethod: user.paymentMethod
+        paymentMethod: user.paymentMethod,
+        subscriptions: user.subscriptions || [],
+        subscriptionCount: user.subscriptions?.length || 0
       }
     });
   } catch (error: any) {

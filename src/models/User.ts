@@ -58,6 +58,23 @@ export interface IUser extends Document {
   savedCardId?: mongoose.Types.ObjectId;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;
+  
+  // Birden fazla abonelik desteği
+  subscriptions?: Array<{
+    plan: "startup" | "business" | "investor";
+    period: "monthly" | "yearly";
+    status: "active" | "pending" | "trial" | "cancelled" | "expired";
+    startDate: Date;
+    endDate?: Date;
+    amount: number;
+    autoRenewal: boolean;
+    paymentMethod: "creditCard" | "bankTransfer" | "other" | "iap";
+    lastPaymentDate: Date;
+    nextPaymentDate: Date;
+    transactionId: string;
+    revenueCatProductId: string;
+    isActive: boolean;
+  }>;
   paymentHistory?: Array<{
     amount: number;
     date: Date;
@@ -353,6 +370,70 @@ const userSchema = new Schema<IUser>(
     },
     nextPaymentDate: {
       type: Date,
+    },
+    // Birden fazla abonelik desteği
+    subscriptions: {
+      type: [
+        {
+          plan: {
+            type: String,
+            enum: ["startup", "business", "investor"],
+            required: true,
+          },
+          period: {
+            type: String,
+            enum: ["monthly", "yearly"],
+            required: true,
+          },
+          status: {
+            type: String,
+            enum: ["active", "pending", "trial", "cancelled", "expired"],
+            default: "active",
+          },
+          startDate: {
+            type: Date,
+            required: true,
+          },
+          endDate: {
+            type: Date,
+          },
+          amount: {
+            type: Number,
+            required: true,
+            min: 0,
+          },
+          autoRenewal: {
+            type: Boolean,
+            default: true,
+          },
+          paymentMethod: {
+            type: String,
+            enum: ["creditCard", "bankTransfer", "other", "iap"],
+            default: "iap",
+          },
+          lastPaymentDate: {
+            type: Date,
+            required: true,
+          },
+          nextPaymentDate: {
+            type: Date,
+            required: true,
+          },
+          transactionId: {
+            type: String,
+            required: true,
+          },
+          revenueCatProductId: {
+            type: String,
+            required: true,
+          },
+          isActive: {
+            type: Boolean,
+            default: true,
+          },
+        },
+      ],
+      default: [],
     },
     paymentHistory: {
       type: [

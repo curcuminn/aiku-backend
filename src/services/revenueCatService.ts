@@ -167,29 +167,16 @@ class RevenueCatService {
       // Eğer kullanıcının aboneliği iptal edilmişse, yeni abonelik olarak işle
       const isReactivation = user.subscriptionStatus === 'cancelled' || user.subscriptionStatus === 'expired';
       
-      // Abonelik bilgilerini güncelle
-      user.subscriptionPlan = productConfig.plan;
-      user.subscriptionPeriod = productConfig.period;
-      user.subscriptionAmount = productConfig.price;
-      user.paymentMethod = 'iap'; // In-App Purchase
-      user.autoRenewal = true;
-      user.lastPaymentDate = purchaseDate;
-
       // Trial kontrolü - sadece ilk kez abonelik alan kullanıcılar için
+      let nextPaymentDate: Date;
       if (productConfig.trialDays > 0 && !isReactivation) {
-        user.subscriptionStatus = 'trial';
         const trialEndDate = new Date(purchaseDate);
         trialEndDate.setDate(trialEndDate.getDate() + productConfig.trialDays);
-        user.trialEndsAt = trialEndDate;
-        user.nextPaymentDate = trialEndDate;
+        nextPaymentDate = trialEndDate;
       } else {
         // Yeniden aktivasyon veya trial olmayan planlar için
-        user.subscriptionStatus = 'active';
-        user.subscriptionStartDate = purchaseDate;
-        user.trialEndsAt = undefined; // Trial'ı kaldır
-        
         // Bir sonraki ödeme tarihini hesapla
-        const nextPaymentDate = new Date(purchaseDate);
+        nextPaymentDate = new Date(purchaseDate);
         if (productConfig.period === 'monthly') {
           nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
         } else {
@@ -197,10 +184,50 @@ class RevenueCatService {
           const extraMonths = (productConfig.plan === 'business' || productConfig.plan === 'investor') ? 3 : 0;
           nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + extraMonths);
         }
-        user.nextPaymentDate = nextPaymentDate;
       }
 
+      // Yeni abonelik oluştur
+      const newSubscription = {
+        plan: productConfig.plan,
+        period: productConfig.period,
+        status: productConfig.trialDays > 0 && !isReactivation ? 'trial' : 'active',
+        startDate: purchaseDate,
+        amount: productConfig.price,
+        autoRenewal: true,
+        paymentMethod: 'iap',
+        lastPaymentDate: purchaseDate,
+        nextPaymentDate: nextPaymentDate,
+        transactionId: event.transaction_id,
+        revenueCatProductId: event.product_id,
+        isActive: true
+      };
+
+      // Subscriptions array'ini başlat
+      if (!user.subscriptions) user.subscriptions = [];
+      
+      // Yeni aboneliği ekle
+      user.subscriptions.push(newSubscription);
+
+      // Ana abonelik bilgilerini güncelle (en son alınan abonelik aktif olur)
+      user.subscriptionPlan = productConfig.plan;
+      user.subscriptionPeriod = productConfig.period;
+      user.subscriptionAmount = productConfig.price;
+      user.paymentMethod = 'iap';
+      user.autoRenewal = true;
+      user.lastPaymentDate = purchaseDate;
+      user.subscriptionStatus = newSubscription.status;
       user.isSubscriptionActive = true;
+
+      if (newSubscription.status === 'trial') {
+        const trialEndDate = new Date(purchaseDate);
+        trialEndDate.setDate(trialEndDate.getDate() + productConfig.trialDays);
+        user.trialEndsAt = trialEndDate;
+        user.nextPaymentDate = trialEndDate;
+      } else {
+        user.subscriptionStartDate = purchaseDate;
+        user.trialEndsAt = undefined;
+        user.nextPaymentDate = newSubscription.nextPaymentDate;
+      }
 
       // Ödeme geçmişine ekle
       if (!user.paymentHistory) user.paymentHistory = [];
@@ -215,7 +242,7 @@ class RevenueCatService {
         type: 'subscription',
         plan: productConfig.plan,
         period: productConfig.period,
-        platform: event.store, // 'APP_STORE' veya 'PLAY_STORE'
+        platform: event.store,
         iapTransactionId: event.transaction_id
       });
 
@@ -226,7 +253,7 @@ class RevenueCatService {
         plan: productConfig.plan,
         period: productConfig.period,
         isReactivation,
-        previousStatus: user.subscriptionStatus
+        subscriptionCount: user.subscriptions.length
       });
 
       return { success: true };
@@ -249,7 +276,31 @@ class RevenueCatService {
       const now = new Date();
       const renewalDate = new Date(event.purchased_at_ms);
 
-      // Abonelik durumunu güncelle
+      // İlgili aboneliği bul ve güncelle
+      if (user.subscriptions && user.subscriptions.length > 0) {
+        const matchingSubscription = user.subscriptions.find(
+          (sub: any) => sub.revenueCatProductId === event.product_id && sub.isActive
+        );
+        
+        if (matchingSubscription) {
+          // Bir sonraki ödeme tarihini hesapla
+          const nextPaymentDate = new Date(renewalDate);
+          if (productConfig.period === 'monthly') {
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+          } else {
+            const extraMonths = (productConfig.plan === 'business' || productConfig.plan === 'investor') ? 3 : 0;
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + extraMonths);
+          }
+
+          // Aboneliği güncelle
+          matchingSubscription.status = 'active';
+          matchingSubscription.lastPaymentDate = renewalDate;
+          matchingSubscription.nextPaymentDate = nextPaymentDate;
+          matchingSubscription.isActive = true;
+        }
+      }
+
+      // Ana abonelik bilgilerini güncelle
       user.subscriptionStatus = 'active';
       user.lastPaymentDate = renewalDate;
       user.isSubscriptionActive = true;
@@ -284,7 +335,8 @@ class RevenueCatService {
       logger.info('IAP abonelik yenileme başarıyla işlendi', {
         userId: user._id,
         plan: productConfig.plan,
-        period: productConfig.period
+        period: productConfig.period,
+        subscriptionCount: user.subscriptions?.length || 0
       });
 
       return { success: true };
@@ -380,7 +432,8 @@ class RevenueCatService {
   }
 
   /**
-   * Ürün değişikliği işlemini işler - Her plan değişikliği yeni abonelik olarak sayılır
+   * Ürün değişikliği işlemini işler - PRODUCT_CHANGE eventini yeni abonelik olarak işler
+   * Mevcut aboneliği değiştirmek yerine yeni bir abonelik olarak kaydeder
    */
   private async handleProductChange(user: any, event: any) {
     try {
@@ -395,13 +448,6 @@ class RevenueCatService {
       const previousPlan = user.subscriptionPlan;
       const previousPeriod = user.subscriptionPeriod;
 
-      // Abonelik planını güncelle
-      user.subscriptionPlan = productConfig.plan;
-      user.subscriptionPeriod = productConfig.period;
-      user.subscriptionAmount = productConfig.price;
-      user.lastPaymentDate = changeDate;
-      user.isSubscriptionActive = true;
-
       // Bir sonraki ödeme tarihini hesapla
       const nextPaymentDate = new Date(changeDate);
       if (productConfig.period === 'monthly') {
@@ -410,6 +456,36 @@ class RevenueCatService {
         const extraMonths = (productConfig.plan === 'business' || productConfig.plan === 'investor') ? 3 : 0;
         nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + extraMonths);
       }
+
+      // Yeni abonelik oluştur
+      const newSubscription = {
+        plan: productConfig.plan,
+        period: productConfig.period,
+        status: 'active',
+        startDate: changeDate,
+        amount: productConfig.price,
+        autoRenewal: true,
+        paymentMethod: 'iap',
+        lastPaymentDate: changeDate,
+        nextPaymentDate: nextPaymentDate,
+        transactionId: event.transaction_id,
+        revenueCatProductId: newProductId,
+        isActive: true
+      };
+
+      // Subscriptions array'ini başlat
+      if (!user.subscriptions) user.subscriptions = [];
+      
+      // Yeni aboneliği ekle
+      user.subscriptions.push(newSubscription);
+
+      // Ana abonelik bilgilerini güncelle (en son alınan abonelik aktif olur)
+      user.subscriptionPlan = productConfig.plan;
+      user.subscriptionPeriod = productConfig.period;
+      user.subscriptionAmount = productConfig.price;
+      user.lastPaymentDate = changeDate;
+      user.isSubscriptionActive = true;
+      user.subscriptionStatus = 'active';
       user.nextPaymentDate = nextPaymentDate;
 
       // Ödeme geçmişine yeni abonelik olarak ekle
@@ -419,7 +495,7 @@ class RevenueCatService {
         date: changeDate,
         status: 'success',
         transactionId: event.transaction_id,
-        description: `IAP ${productConfig.plan} ${productConfig.period} abonelik (${previousPlan} ${previousPeriod} → ${productConfig.plan} ${productConfig.period})`,
+        description: `IAP ${productConfig.plan} ${productConfig.period} yeni abonelik (önceki: ${previousPlan} ${previousPeriod})`,
         type: 'subscription',
         plan: productConfig.plan,
         period: productConfig.period,
@@ -429,14 +505,16 @@ class RevenueCatService {
 
       await user.save();
 
-      logger.info('IAP ürün değişikliği işlendi - Yeni abonelik olarak kaydedildi', {
+      logger.info('IAP PRODUCT_CHANGE eventi yeni abonelik olarak işlendi', {
         userId: user._id,
         previousPlan,
         previousPeriod,
         newPlan: productConfig.plan,
         newPeriod: productConfig.period,
         newProductId,
-        transactionId: event.transaction_id
+        transactionId: event.transaction_id,
+        eventType: 'PRODUCT_CHANGE',
+        subscriptionCount: user.subscriptions.length
       });
 
       return { success: true };
