@@ -384,9 +384,11 @@ class RevenueCatService {
    */
   private async handleProductChange(user: any, event: any) {
     try {
-      const productConfig = this.getProductConfig(event.product_id);
+      // Yeni product ID'yi kullan (new_product_id varsa)
+      const newProductId = event.new_product_id || event.product_id;
+      const productConfig = this.getProductConfig(newProductId);
       if (!productConfig) {
-        throw new Error(`Product config not found for: ${event.product_id}`);
+        throw new Error(`Product config not found for: ${newProductId}`);
       }
 
       const changeDate = new Date(event.purchased_at_ms);
@@ -433,6 +435,7 @@ class RevenueCatService {
         previousPeriod,
         newPlan: productConfig.plan,
         newPeriod: productConfig.period,
+        newProductId,
         transactionId: event.transaction_id
       });
 
