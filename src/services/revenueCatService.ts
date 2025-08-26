@@ -614,9 +614,26 @@ class RevenueCatService {
         }
       });
 
+      // Detaylı log ekle
+      logger.info('RevenueCat API response alındı', {
+        appUserId,
+        status: response.status,
+        dataKeys: Object.keys(response.data),
+        entitlements: response.data?.entitlements,
+        subscriptions: response.data?.subscriptions,
+        originalAppUserId: response.data?.original_app_user_id,
+        firstSeen: response.data?.first_seen,
+        lastSeen: response.data?.last_seen
+      });
+
       return response.data;
     } catch (error: any) {
-      logger.error('RevenueCat kullanıcı bilgisi alma hatası', { error: error.message });
+      logger.error('RevenueCat kullanıcı bilgisi alma hatası', { 
+        appUserId,
+        error: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
       throw error;
     }
   }

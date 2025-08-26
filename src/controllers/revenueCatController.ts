@@ -132,6 +132,15 @@ export const getUserRevenueCatInfo = async (
 
     const userInfo = await revenueCatService.getUserInfo(appUserId);
     
+    // Detaylı log ekle
+    logger.info('RevenueCat kullanıcı bilgisi alındı', {
+      userId,
+      appUserId,
+      entitlements: userInfo?.entitlements,
+      subscriptions: userInfo?.subscriptions,
+      originalAppUserId: userInfo?.original_app_user_id
+    });
+    
     res.status(200).json({
       success: true,
       userInfo: userInfo
@@ -521,6 +530,20 @@ export const getTestUser = async (
       });
     }
 
+    // RevenueCat bilgilerini de al
+    let revenueCatInfo = null;
+    if (user.revenueCatId) {
+      try {
+        revenueCatInfo = await revenueCatService.getUserInfo(user.revenueCatId);
+      } catch (error: any) {
+        logger.warn('RevenueCat bilgisi alınamadı', { 
+          userId: user._id, 
+          revenueCatId: user.revenueCatId,
+          error: error.message 
+        });
+      }
+    }
+
     res.status(200).json({
       success: true,
       user: {
@@ -533,8 +556,10 @@ export const getTestUser = async (
         subscriptionPlan: user.subscriptionPlan,
         paymentMethod: user.paymentMethod,
         subscriptions: user.subscriptions || [],
-        subscriptionCount: user.subscriptions?.length || 0
-      }
+        subscriptionCount: user.subscriptions?.length || 0,
+        activeSubscriptionCount: user.subscriptions?.filter((sub: any) => sub.isActive).length || 0
+      },
+      revenueCatInfo: revenueCatInfo
     });
   } catch (error: any) {
     logger.error('Test kullanıcısı getirme hatası', { error: error.message });
