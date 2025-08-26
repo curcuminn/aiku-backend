@@ -98,15 +98,31 @@ class RevenueCatService {
             eventType: rawPayload.event?.type
           });
           
-          // Event'i al
-          webhookEvent = rawPayload.event;
+          // Event'i al - yeni signed payload formatında data field'ı olabilir
+          webhookEvent = rawPayload.event || rawPayload.data;
+          
+          // Eğer data field'ı varsa ve notificationType varsa, bu yeni format
+          if (rawPayload.notificationType && rawPayload.data) {
+            logger.info('Yeni RevenueCat signed payload formatı tespit edildi', {
+              notificationType: rawPayload.notificationType,
+              subtype: rawPayload.subtype,
+              dataKeys: Object.keys(rawPayload.data)
+            });
+            
+            // Yeni format için event'i data'dan oluştur
+            webhookEvent = {
+              type: rawPayload.notificationType,
+              subtype: rawPayload.subtype,
+              ...rawPayload.data
+            };
+          }
           
           if (!webhookEvent) {
-            logger.error('Signed payload içinde event bulunamadı', { 
+            logger.error('Signed payload içinde event veya data bulunamadı', { 
               payloadKeys: Object.keys(rawPayload),
               rawPayload: JSON.stringify(rawPayload).substring(0, 500)
             });
-            return { success: false, error: 'No event found in signed payload' };
+            return { success: false, error: 'No event or data found in signed payload' };
           }
           
           logger.info('Signed payload event extracted', {
