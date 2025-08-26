@@ -9,7 +9,10 @@ import {
   syncRevenueCatId,
   createTestUser,
   getTestUser,
-  testUserWebhook
+  testUserWebhook,
+  getUserSubscriptions,
+  cancelSubscription,
+  cancelAllSubscriptions
 } from '../controllers/revenueCatController';
 import { protect } from '../middleware/auth';
 
@@ -75,5 +78,23 @@ router.get('/plans', getMobileSubscriptionPlans);
  * GET /api/revenuecat/payment-method
  */
 router.get('/payment-method', protect, checkPaymentMethod);
+
+/**
+ * Kullanıcının tüm aboneliklerini getirir
+ * GET /api/revenuecat/subscriptions
+ */
+router.get('/subscriptions', protect, getUserSubscriptions);
+
+/**
+ * Belirli bir aboneliği iptal eder
+ * DELETE /api/revenuecat/subscriptions/:subscriptionId
+ */
+router.delete('/subscriptions/:subscriptionId', protect, cancelSubscription);
+
+/**
+ * Kullanıcının tüm aboneliklerini iptal eder
+ * DELETE /api/revenuecat/subscriptions
+ */
+router.delete('/subscriptions', protect, cancelAllSubscriptions);
 
 export default router;

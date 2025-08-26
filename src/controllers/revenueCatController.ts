@@ -545,3 +545,234 @@ export const getTestUser = async (
     });
   }
 };
+
+/**
+ * Kullanıcının tüm aboneliklerini getirir
+ */
+export const getUserSubscriptions = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Oturum açmanız gerekiyor',
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      subscriptions: user.subscriptions || [],
+      subscriptionCount: user.subscriptions?.length || 0,
+      activeSubscriptionCount: user.subscriptions?.filter((sub: any) => sub.isActive).length || 0
+    });
+  } catch (error: any) {
+    logger.error('Kullanıcı abonelikleri getirme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Abonelikler alınamadı',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Belirli bir aboneliği iptal eder
+ */
+export const cancelSubscription = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Oturum açmanız gerekiyor',
+      });
+    }
+
+    const { subscriptionId } = req.params;
+    
+    if (!subscriptionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'subscriptionId gerekli'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // Aboneliği bul
+    const subscription = user.subscriptions?.find((sub: any) => sub._id?.toString() === subscriptionId);
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'Abonelik bulunamadı'
+      });
+    }
+
+    if (!subscription.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu abonelik zaten iptal edilmiş'
+      });
+    }
+
+    // Aboneliği iptal et
+    subscription.status = 'cancelled';
+    subscription.isActive = false;
+    subscription.autoRenewal = false;
+    
+    // Eğer bu aktif abonelikse, ana abonelik bilgilerini güncelle
+    if (user.subscriptionPlan === subscription.plan && 
+        user.subscriptionPeriod === subscription.period) {
+      
+      // Başka aktif abonelik var mı kontrol et
+      const otherActiveSubscriptions = user.subscriptions?.filter((sub: any) => 
+        sub.isActive && sub._id.toString() !== subscriptionId
+      );
+      
+      if (otherActiveSubscriptions && otherActiveSubscriptions.length > 0) {
+        // En son alınan aktif aboneliği ana abonelik yap
+        const latestActive = otherActiveSubscriptions.sort((a: any, b: any) => 
+          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+        )[0];
+        
+        user.subscriptionPlan = latestActive.plan;
+        user.subscriptionPeriod = latestActive.period;
+        user.subscriptionAmount = latestActive.amount;
+        user.subscriptionStatus = latestActive.status;
+        user.nextPaymentDate = latestActive.nextPaymentDate;
+      } else {
+        // Hiç aktif abonelik kalmadı
+        user.subscriptionStatus = 'cancelled';
+        user.isSubscriptionActive = false;
+        user.subscriptionPlan = undefined;
+        user.subscriptionPeriod = undefined;
+        user.subscriptionAmount = undefined;
+      }
+    }
+
+    await user.save();
+
+    logger.info('Abonelik iptal edildi', {
+      userId: user._id,
+      subscriptionId,
+      plan: subscription.plan,
+      period: subscription.period
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Abonelik başarıyla iptal edildi',
+      cancelledSubscription: {
+        id: subscription._id?.toString(),
+        plan: subscription.plan,
+        period: subscription.period,
+        status: subscription.status
+      },
+      remainingActiveCount: user.subscriptions?.filter((sub: any) => sub.isActive).length || 0
+    });
+  } catch (error: any) {
+    logger.error('Abonelik iptal etme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Abonelik iptal edilemedi',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Kullanıcının tüm aboneliklerini iptal eder
+ */
+export const cancelAllSubscriptions = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Oturum açmanız gerekiyor',
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    if (!user.subscriptions || user.subscriptions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'İptal edilecek abonelik bulunamadı'
+      });
+    }
+
+    const cancelledCount = user.subscriptions.filter((sub: any) => sub.isActive).length;
+
+    // Tüm aktif abonelikleri iptal et
+    user.subscriptions.forEach((subscription: any) => {
+      if (subscription.isActive) {
+        subscription.status = 'cancelled';
+        subscription.isActive = false;
+        subscription.autoRenewal = false;
+      }
+    });
+
+    // Ana abonelik bilgilerini güncelle
+    user.subscriptionStatus = 'cancelled';
+    user.isSubscriptionActive = false;
+    user.subscriptionPlan = undefined;
+    user.subscriptionPeriod = undefined;
+    user.subscriptionAmount = undefined;
+    user.autoRenewal = false;
+
+    await user.save();
+
+    logger.info('Tüm abonelikler iptal edildi', {
+      userId: user._id,
+      cancelledCount
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Tüm abonelikler başarıyla iptal edildi',
+      cancelledCount,
+      totalSubscriptions: user.subscriptions.length
+    });
+  } catch (error: any) {
+    logger.error('Tüm abonelikleri iptal etme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Abonelikler iptal edilemedi',
+      error: error.message
+    });
+  }
+};
