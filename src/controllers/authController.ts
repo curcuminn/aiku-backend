@@ -402,8 +402,8 @@ export const login = async (req: Request, res: Response) => {
       lastSeen: user.lastSeen,
       acceptChatNotification: user.acceptChatNotification,
       favoriteIdeas: Array.isArray((user as any).favoriteIdeas)
-          ? (user as any).favoriteIdeas
-          : [],
+        ? (user as any).favoriteIdeas
+        : [],
     };
 
     res.status(200).json({
@@ -554,8 +554,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
     // Şifre güncelleniyorsa hashle
     if (password && password.length >= 6) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
+      user.password = password;
     }
 
     // Güncellenmiş kullanıcıyı kaydet
@@ -1551,8 +1550,8 @@ export const checkUserAuthMethod = async (req: Request, res: Response) => {
     }
 
     // Kullanıcıyı bul
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim()
     }).select('email authProvider googleId linkedinId supabaseId password accountStatus');
 
     if (!user) {
@@ -1623,8 +1622,8 @@ export const sendMobileSocialEmailCode = async (req: Request, res: Response) => 
     }
 
     // Kullanıcıyı bul
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim()
     });
 
     if (!user) {
@@ -1662,7 +1661,7 @@ export const sendMobileSocialEmailCode = async (req: Request, res: Response) => 
     // Mail gönder
     try {
       await brevoService.sendMobileVerificationCode(email, verificationCode, expiresInMinutes);
-      
+
       res.status(200).json({
         success: true,
         message: "Doğrulama kodu email adresinize gönderildi",
@@ -1673,12 +1672,12 @@ export const sendMobileSocialEmailCode = async (req: Request, res: Response) => 
       });
     } catch (error) {
       console.error('Mail gönderme hatası:', error);
-      
+
       // Test için: Mail gönderilemese bile kodu console'a yazdır
       console.log('🔐 TEST KODU:', verificationCode);
       console.log('📧 Email:', email);
       console.log('⏰ Süre:', expiresInMinutes, 'dakika');
-      
+
       res.status(200).json({
         success: true,
         message: "Doğrulama kodu oluşturuldu (test modu)",
@@ -1716,8 +1715,8 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
     }
 
     // Kullanıcıyı bul - select: false alanları da getir
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim()
     }).select('+mobileVerificationCode +mobileVerificationExpires email accountStatus authProvider');
 
     if (!user) {
@@ -1810,8 +1809,8 @@ export const verifyMobileSocialEmailCode = async (req: Request, res: Response) =
       lastSeen: user.lastSeen,
       acceptChatNotification: user.acceptChatNotification,
       favoriteIdeas: Array.isArray((user as any).favoriteIdeas)
-          ? (user as any).favoriteIdeas
-          : [],
+        ? (user as any).favoriteIdeas
+        : [],
     };
 
     res.status(200).json({
@@ -1847,8 +1846,8 @@ export const sendPasswordResetCode = async (req: Request, res: Response) => {
     }
 
     // Kullanıcıyı bul
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim()
     }).select('email accountStatus authProvider password');
 
     if (!user) {
@@ -1894,7 +1893,7 @@ export const sendPasswordResetCode = async (req: Request, res: Response) => {
     // Mail gönder
     try {
       await brevoService.sendPasswordResetCode(email, resetCode, expiresInMinutes);
-      
+
       res.status(200).json({
         success: true,
         message: "Şifre sıfırlama kodu email adresinize gönderildi",
@@ -1905,12 +1904,12 @@ export const sendPasswordResetCode = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error('Mail gönderme hatası:', error);
-      
+
       // Test için: Mail gönderilemese bile kodu console'a yazdır
       console.log('🔐 TEST ŞİFRE SIFIRLAMA KODU:', resetCode);
       console.log('📧 Email:', email);
       console.log('⏰ Süre:', expiresInMinutes, 'dakika');
-      
+
       res.status(200).json({
         success: true,
         message: "Şifre sıfırlama kodu oluşturuldu (test modu)",
@@ -1956,8 +1955,8 @@ export const verifyPasswordResetCode = async (req: Request, res: Response) => {
     }
 
     // Kullanıcıyı bul - select: false alanları da getir
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const user = await User.findOne({
+      email: email.toLowerCase().trim()
     }).select('+passwordResetToken +passwordResetExpires email accountStatus authProvider password');
 
     if (!user) {
@@ -2013,9 +2012,8 @@ export const verifyPasswordResetCode = async (req: Request, res: Response) => {
     }
 
     // Yeni şifreyi hashle ve kaydet
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    
+    user.password = newPassword;
+
     // Kodu temizle
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
