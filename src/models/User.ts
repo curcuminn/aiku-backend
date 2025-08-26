@@ -61,6 +61,7 @@ export interface IUser extends Document {
   
   // Birden fazla abonelik desteği
   subscriptions?: Array<{
+    _id?: mongoose.Types.ObjectId;
     plan: "startup" | "business" | "investor";
     period: "monthly" | "yearly";
     status: "active" | "pending" | "trial" | "cancelled" | "expired";

@@ -686,7 +686,7 @@ export const cancelSubscription = async (
       success: true,
       message: 'Abonelik başarıyla iptal edildi',
       cancelledSubscription: {
-        id: subscription._id?.toString(),
+        id: subscription._id?.toString() || subscriptionId,
         plan: subscription.plan,
         period: subscription.period,
         status: subscription.status
