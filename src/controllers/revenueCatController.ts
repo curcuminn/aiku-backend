@@ -1056,6 +1056,63 @@ export const updateSubscriptionRenewal = async (
 };
 
 /**
+ * Kullanıcının RevenueCat ID'sini manuel olarak günceller
+ * Sadece admin kullanımı için
+ */
+export const updateUserRevenueCatId = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { userId, revenueCatId } = req.body;
+    
+    if (!userId || !revenueCatId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId ve revenueCatId gerekli'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // RevenueCat ID'yi güncelle
+    user.revenueCatId = revenueCatId;
+    await user.save();
+
+    logger.info('Kullanıcının RevenueCat ID\'si manuel olarak güncellendi', {
+      userId: user._id,
+      userEmail: user.email,
+      revenueCatId
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'RevenueCat ID başarıyla güncellendi',
+      data: {
+        userId: user._id,
+        email: user.email,
+        revenueCatId: user.revenueCatId
+      }
+    });
+  } catch (error: any) {
+    logger.error('RevenueCat ID güncelleme hatası', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'RevenueCat ID güncellenirken hata oluştu',
+      error: error.message
+    });
+  }
+};
+
+/**
  * RevenueCat webhook'unu test eder - gerçek webhook verisi ile
  * Bu endpoint RevenueCat'ten gelen gerçek webhook verisini test eder
  */
