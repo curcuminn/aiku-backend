@@ -158,13 +158,41 @@ class RevenueCatService {
       }
 
       // Kullanıcıyı bul (app_user_id genellikle email veya custom user ID)
-      const user = await this.findUserByRevenueCatId(webhookEvent.app_user_id);
+      let user = await this.findUserByRevenueCatId(webhookEvent.app_user_id);
+      
+      // Eğer bulunamazsa ve original_app_user_id varsa, onunla da dene
+      if (!user && webhookEvent.original_app_user_id && webhookEvent.original_app_user_id !== webhookEvent.app_user_id) {
+        logger.info('Original app user ID ile kullanıcı aranıyor', {
+          currentId: webhookEvent.app_user_id,
+          originalId: webhookEvent.original_app_user_id
+        });
+        user = await this.findUserByRevenueCatId(webhookEvent.original_app_user_id);
+        
+                 // Eğer original ID ile bulunursa, yeni ID'yi de kaydet
+         if (user) {
+           logger.info('Original ID ile kullanıcı bulundu, yeni ID kaydediliyor', {
+             userId: user._id,
+             originalId: webhookEvent.original_app_user_id,
+             newId: webhookEvent.app_user_id
+           });
+           
+           // Yeni ID'yi revenueCatId olarak güncelle
+           user.revenueCatId = webhookEvent.app_user_id;
+           await user.save();
+         }
+      }
       
       if (!user) {
         logger.warn('RevenueCat webhook için kullanıcı bulunamadı', {
-          appUserId: webhookEvent.app_user_id
+          appUserId: webhookEvent.app_user_id,
+          originalAppUserId: webhookEvent.original_app_user_id,
+          eventType: webhookEvent.type,
+          productId: webhookEvent.product_id
         });
-        return { success: false, error: 'User not found' };
+        
+        // Kullanıcı bulunamadığında webhook'u başarılı olarak işaretle
+        // RevenueCat'in tekrar denemesini engelle
+        return { success: true, message: 'User not found, but webhook processed' };
       }
 
       // Event tipine göre işlem yap
@@ -634,7 +662,7 @@ class RevenueCatService {
   /**
    * RevenueCat app_user_id ile kullanıcıyı bulur
    */
-  private async findUserByRevenueCatId(appUserId: string) {
+  private async findUserByRevenueCatId(appUserId: string): Promise<any> {
     try {
       // Önce revenueCatId field'ı ile dene
       let user = await User.findOne({ 'revenueCatId': appUserId });
@@ -650,6 +678,32 @@ class RevenueCatService {
         // Son olarak email ile dene (eğer app_user_id email formatında ise)
         if (appUserId.includes('@')) {
           user = await User.findOne({ 'email': appUserId });
+        }
+      }
+
+      // Eğer hala bulunamazsa ve anonymous ID ise, RevenueCat API'den bilgi almaya çalış
+      if (!user && appUserId.startsWith('$RCAnonymousID:')) {
+        try {
+          logger.info('Anonymous ID için RevenueCat API\'den bilgi alınıyor', { appUserId });
+          const userInfo = await this.getUserInfo(appUserId);
+          
+          // API'den gelen original_app_user_id ile tekrar dene
+          if (userInfo.original_app_user_id && userInfo.original_app_user_id !== appUserId) {
+            logger.info('Original app user ID ile tekrar aranıyor', { 
+              originalId: userInfo.original_app_user_id,
+              currentId: appUserId 
+            });
+            // Recursive call yerine doğrudan arama yap
+            user = await User.findOne({ 'revenueCatId': userInfo.original_app_user_id });
+            if (!user && userInfo.original_app_user_id.match(/^[0-9a-fA-F]{24}$/)) {
+              user = await User.findById(userInfo.original_app_user_id);
+            }
+          }
+        } catch (apiError: any) {
+          logger.warn('RevenueCat API\'den bilgi alınamadı', { 
+            appUserId, 
+            error: apiError.message 
+          });
         }
       }
       
