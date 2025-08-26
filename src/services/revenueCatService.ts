@@ -174,12 +174,26 @@ class RevenueCatService {
       }
 
       // Kullanıcıyı bul (app_user_id genellikle email veya custom user ID)
-      let user = await this.findUserByRevenueCatId(webhookEvent.app_user_id);
+      // Bazı event'lerde app_user_id yerine appUserId olabilir (signed payload'dan)
+      const appUserId = webhookEvent.app_user_id || webhookEvent.appUserId;
+
+      if (!appUserId) {
+        logger.warn('Webhook eventinde app_user_id bulunamadı', {
+          eventType: webhookEvent.type,
+          webhookEventKeys: Object.keys(webhookEvent)
+        });
+
+        // app_user_id olmayan event'ler için de başarı döndür
+        // RevenueCat'in tekrar denemesini engelle
+        return { success: true, message: 'No app_user_id found in event' };
+      }
+
+      let user = await this.findUserByRevenueCatId(appUserId);
       
       // Eğer bulunamazsa ve original_app_user_id varsa, onunla da dene
-      if (!user && webhookEvent.original_app_user_id && webhookEvent.original_app_user_id !== webhookEvent.app_user_id) {
+      if (!user && webhookEvent.original_app_user_id && webhookEvent.original_app_user_id !== appUserId) {
         logger.info('Original app user ID ile kullanıcı aranıyor', {
-          currentId: webhookEvent.app_user_id,
+          currentId: appUserId,
           originalId: webhookEvent.original_app_user_id
         });
         user = await this.findUserByRevenueCatId(webhookEvent.original_app_user_id);
@@ -189,18 +203,18 @@ class RevenueCatService {
            logger.info('Original ID ile kullanıcı bulundu, yeni ID kaydediliyor', {
              userId: user._id,
              originalId: webhookEvent.original_app_user_id,
-             newId: webhookEvent.app_user_id
+             newId: appUserId
            });
            
            // Yeni ID'yi revenueCatId olarak güncelle
-           user.revenueCatId = webhookEvent.app_user_id;
+           user.revenueCatId = appUserId;
            await user.save();
          }
       }
       
       if (!user) {
         logger.warn('RevenueCat webhook için kullanıcı bulunamadı', {
-          appUserId: webhookEvent.app_user_id,
+          appUserId: appUserId,
           originalAppUserId: webhookEvent.original_app_user_id,
           eventType: webhookEvent.type,
           productId: webhookEvent.product_id
@@ -236,7 +250,10 @@ class RevenueCatService {
         
         case 'PRODUCT_CHANGE':
           return await this.handleProductChange(user, webhookEvent);
-        
+
+        case 'DID_CHANGE_RENEWAL_PREF':
+          return await this.handleDidChangeRenewalPref(user, webhookEvent);
+
         default:
           logger.info('Bilinmeyen RevenueCat event tipi', {
             eventType: webhookEvent.type
@@ -632,6 +649,88 @@ class RevenueCatService {
       return { success: true };
     } catch (error: any) {
       logger.error('IAP ürün değişikliği hatası', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Abonelik değişikliği tercih işlemi (DID_CHANGE_RENEWAL_PREF)
+   */
+  private async handleDidChangeRenewalPref(user: any, event: any) {
+    try {
+      logger.info('DID_CHANGE_RENEWAL_PREF event işleniyor', {
+        userId: user._id,
+        subtype: event.subtype,
+        productId: event.product_id,
+        transactionId: event.transaction_id
+      });
+
+      const changeDate = new Date(event.purchased_at_ms);
+
+      // Subtype'a göre işlem yap
+      if (event.subtype === 'DOWNGRADE') {
+        // Kullanıcı daha düşük bir pakete geçmiş
+        // Auto-renewal durumunu güncelle
+        user.autoRenewal = false;
+
+        // Subscriptions array'indeki aktif aboneliği bul ve güncelle
+        if (user.subscriptions && user.subscriptions.length > 0) {
+          const activeSubscription = user.subscriptions.find((sub: any) => sub.isActive);
+          if (activeSubscription) {
+            activeSubscription.status = 'cancelled';
+            activeSubscription.autoRenewal = false;
+
+            // isActive'i nextPaymentDate'e göre hesapla
+            const now = new Date();
+            activeSubscription.isActive = activeSubscription.nextPaymentDate && now < activeSubscription.nextPaymentDate;
+          }
+        }
+
+        // Ana abonelik durumunu güncelle
+        user.subscriptionStatus = 'cancelled';
+
+        logger.info('DID_CHANGE_RENEWAL_PREF DOWNGRADE işlendi', {
+          userId: user._id,
+          productId: event.product_id,
+          transactionId: event.transaction_id
+        });
+
+      } else if (event.subtype === 'UPGRADE') {
+        // Kullanıcı daha yüksek bir pakete geçmiş
+        // Bu durumda genellikle PRODUCT_CHANGE eventi de gelir
+        logger.info('DID_CHANGE_RENEWAL_PREF UPGRADE tespit edildi', {
+          userId: user._id,
+          productId: event.product_id,
+          transactionId: event.transaction_id
+        });
+
+        // Upgrade için özel işlem yapmadan devam et
+        // Gerçek değişiklik PRODUCT_CHANGE eventinde işlenir
+
+      } else {
+        logger.warn('Bilinmeyen DID_CHANGE_RENEWAL_PREF subtype', {
+          userId: user._id,
+          subtype: event.subtype,
+          productId: event.product_id
+        });
+      }
+
+      await user.save();
+
+      logger.info('DID_CHANGE_RENEWAL_PREF başarıyla işlendi', {
+        userId: user._id,
+        subtype: event.subtype,
+        productId: event.product_id,
+        transactionId: event.transaction_id
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logger.error('DID_CHANGE_RENEWAL_PREF işleme hatası', {
+        userId: user._id,
+        error: error.message,
+        subtype: event.subtype
+      });
       throw error;
     }
   }
