@@ -53,32 +53,86 @@ class RevenueCatService {
     try {
       let webhookEvent: any;
       
-      // Signed payload kontrolü - Şimdilik ignore et, sadece normal event formatını kullan
+      // Signed payload kontrolü
       if ('signedPayload' in event) {
-        logger.warn('Signed payload alındı ama ignore ediliyor - normal event formatı tercih ediliyor');
+        logger.info('Signed payload alındı, parse ediliyor...');
         
-        // Signed payload'ı ignore et ve normal event formatını dene
-        if ('event' in event) {
-          webhookEvent = event.event;
-          logger.info('Normal event formatı kullanılıyor (signed payload ignore edildi)', {
-            eventType: webhookEvent?.type
+        try {
+          // RevenueCat signed payload formatı: JWT benzeri 3 parçalı yapı
+          const payloadParts = event.signedPayload.split('.');
+          
+          logger.info('Signed payload parts', {
+            partsCount: payloadParts.length,
+            part1Length: payloadParts[0]?.length || 0,
+            part2Length: payloadParts[1]?.length || 0,
+            part3Length: payloadParts[2]?.length || 0
           });
-        } else {
-          // Eğer normal event yoksa, signed payload'ı raw parse etmeyi dene
-          try {
-            const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
-            const rawPayload = JSON.parse(decodedPayload);
-            webhookEvent = rawPayload.event;
-            logger.info('Signed payload raw parse edildi', {
-              eventType: webhookEvent?.type
+          
+          if (payloadParts.length !== 3) {
+            logger.error('Geçersiz signed payload formatı - 3 parça bekleniyor', {
+              partsCount: payloadParts.length
             });
-          } catch (parseError) {
-            logger.error('Signed payload parse hatası', { error: parseError });
-            return { success: false, error: 'Cannot parse signed payload' };
+            return { success: false, error: 'Invalid signed payload format' };
           }
+          
+          // İkinci parça (payload) decode et
+          const encodedPayload = payloadParts[1];
+          
+          // Base64URL decode (JWT standardı)
+          // Base64URL'deki - ve _ karakterlerini + ve / ile değiştir
+          const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+          // Padding ekle
+          const paddedBase64 = base64 + '='.repeat((4 - base64.length % 4) % 4);
+          
+          const decodedPayload = Buffer.from(paddedBase64, 'base64').toString('utf-8');
+          logger.info('Signed payload decoded', { 
+            decodedLength: decodedPayload.length,
+            firstChars: decodedPayload.substring(0, 200)
+          });
+          
+          // JSON parse et
+          const rawPayload = JSON.parse(decodedPayload);
+          logger.info('Signed payload parsed', { 
+            payloadKeys: Object.keys(rawPayload),
+            hasEvent: !!rawPayload.event,
+            eventType: rawPayload.event?.type
+          });
+          
+          // Event'i al
+          webhookEvent = rawPayload.event;
+          
+          if (!webhookEvent) {
+            logger.error('Signed payload içinde event bulunamadı', { 
+              payloadKeys: Object.keys(rawPayload),
+              rawPayload: JSON.stringify(rawPayload).substring(0, 500)
+            });
+            return { success: false, error: 'No event found in signed payload' };
+          }
+          
+          logger.info('Signed payload event extracted', {
+            eventType: webhookEvent.type,
+            appUserId: webhookEvent.app_user_id,
+            productId: webhookEvent.product_id
+          });
+          
+        } catch (parseError: any) {
+          logger.error('Signed payload parse hatası', { 
+            error: parseError,
+            errorMessage: parseError.message,
+            signedPayloadLength: event.signedPayload.length,
+            signedPayloadStart: event.signedPayload.substring(0, 100)
+          });
+          return { success: false, error: 'Cannot parse signed payload' };
         }
-      } else {
+      } else if ('event' in event) {
+        // Normal event formatı
         webhookEvent = event.event;
+        logger.info('Normal event formatı kullanılıyor', {
+          eventType: webhookEvent?.type
+        });
+      } else {
+        logger.error('Geçersiz webhook formatı', { event });
+        return { success: false, error: 'Invalid webhook format' };
       }
 
       // Event kontrolü
