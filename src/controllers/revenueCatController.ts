@@ -34,6 +34,15 @@ export const handleRevenueCatWebhook = async (
       return res.status(400).json({ error: 'Empty webhook body' });
     }
 
+    logger.info('RevenueCat webhook body alındı', {
+      hasSignedPayload: !!webhookBody.signedPayload,
+      hasEvent: !!webhookBody.event,
+      bodyKeys: Object.keys(webhookBody),
+      signedPayloadLength: webhookBody.signedPayload?.length || 0,
+      contentType: req.headers['content-type'],
+      userAgent: req.headers['user-agent']
+    });
+
     // Webhook event'ini işle
     const result = await revenueCatService.handleWebhook(webhookBody);
     
@@ -145,51 +154,59 @@ export const testWebhook = async (
   res: express.Response
 ) => {
   try {
+    logger.info('Test webhook çağrıldı');
+    
+    // Gerçek RevenueCat webhook formatında test event'i oluştur
     const testEvent = {
-      api_version: '1.0',
-      event: {
-        type: 'TEST',
-        id: 'test-event-id',
-        app_user_id: 'test-user-id',
-        product_id: 'test_product',
-        period_type: 'NORMAL',
-        purchased_at_ms: Date.now(),
-        expiration_at_ms: Date.now() + (2 * 60 * 60 * 1000), // 2 saat sonra
-        environment: 'SANDBOX',
-        entitlement_id: null as any,
-        entitlement_ids: null as any,
-        presented_offering_id: null as any,
-        transaction_id: null as any,
-        original_transaction_id: null as any,
-        is_family_share: null as any,
-        country_code: 'US',
-        original_app_user_id: 'test-user-id',
-        aliases: [],
-        currency: null,
-        price: null,
-        price_in_purchased_currency: null,
-        subscriber_attributes: {},
-        store: 'APP_STORE',
-        takehome_percentage: null,
-        offer_code: null as any,
-        tax_percentage: null,
-        commission_percentage: null,
-        metadata: null,
-        renewal_number: null,
-        app_id: 'test-app-id'
-      }
+      signedPayload: Buffer.from(JSON.stringify({
+        event: {
+          type: 'INITIAL_PURCHASE',
+          id: 'test_event_id',
+          app_user_id: 'admin@test.com',
+          product_id: 'startup_monthly',
+          store: 'apple_app',
+          transaction_id: 'test_transaction_id',
+          purchased_at_ms: Date.now(),
+          environment: 'Sandbox',
+          country_code: 'TR',
+          app_id: 'test_app_id',
+          period_type: 'normal',
+          entitlement_id: 'premium',
+          entitlement_ids: ['premium'],
+          is_family_share: false,
+          subscriber_attributes: {},
+          takehome_percentage: 70,
+          commission_percentage: 30,
+          is_trial_conversion: false
+        }
+      })).toString('base64')
     };
-
+    
+    logger.info('Test event oluşturuldu', {
+      eventType: 'INITIAL_PURCHASE',
+      appUserId: 'admin@test.com',
+      productId: 'startup_monthly'
+    });
+    
     const result = await revenueCatService.handleWebhook(testEvent);
     
     res.status(200).json({
       success: true,
-      message: 'Test webhook processed',
-      result
+      message: 'Test webhook başarılı',
+      result,
+      testEvent: {
+        type: 'INITIAL_PURCHASE',
+        appUserId: 'admin@test.com',
+        productId: 'startup_monthly'
+      }
     });
   } catch (error: any) {
     logger.error('Test webhook hatası', { error: error.message });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Test webhook hatası',
+      error: error.message
+    });
   }
 };
 

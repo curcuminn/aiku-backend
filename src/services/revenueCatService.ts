@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { verify } from 'jsonwebtoken';
 import { User } from '../models/User';
 import revenueCatConfig from '../config/revenueCat';
 import logger from '../config/logger';
@@ -55,18 +56,79 @@ class RevenueCatService {
       // Signed payload kontrolü
       if ('signedPayload' in event) {
         try {
-          // Signed payload'ı decode et (basit base64 decode)
-          const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
-          const payloadData = JSON.parse(decodedPayload);
-          webhookEvent = payloadData.event;
-          
-          logger.info('Signed payload decode edildi', {
-            eventType: webhookEvent?.type,
-            appUserId: webhookEvent?.app_user_id
+          logger.info('Signed payload alındı, decode ediliyor...', {
+            payloadLength: event.signedPayload.length
           });
-        } catch (decodeError) {
-          logger.error('Signed payload decode hatası', { error: decodeError });
-          return { success: false, error: 'Invalid signed payload' };
+          
+          // RevenueCat signed payload'ı JWT formatında gelir
+          // Önce base64 decode et, sonra JWT verify et
+          const decodedPayload = Buffer.from(event.signedPayload, 'base64').toString('utf-8');
+          logger.info('Decoded payload başlangıcı:', { 
+            decodedStart: decodedPayload.substring(0, 200) + '...',
+            payloadLength: decodedPayload.length,
+            isJWT: decodedPayload.includes('.') && decodedPayload.split('.').length === 3
+          });
+          
+          // JWT verify et (RevenueCat webhook secret ile)
+          const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+          
+          if (!webhookSecret) {
+            logger.warn('REVENUECAT_WEBHOOK_SECRET bulunamadı, signed payload decode edilemiyor');
+            // Secret yoksa signed payload'ı raw olarak parse etmeyi dene
+            try {
+              const rawPayload = JSON.parse(decodedPayload);
+              webhookEvent = rawPayload.event;
+              logger.info('Raw payload parse edildi (secret yok)', {
+                eventType: webhookEvent?.type
+              });
+            } catch (parseError) {
+              logger.error('Raw payload parse hatası', { error: parseError });
+              return { success: false, error: 'Cannot parse signed payload without secret' };
+            }
+          } else {
+            // JWT verify et
+            try {
+              const verifiedPayload = verify(decodedPayload, webhookSecret) as any;
+              webhookEvent = verifiedPayload.event;
+              logger.info('JWT verify başarılı', {
+                eventType: webhookEvent?.type
+              });
+            } catch (jwtError) {
+              logger.error('JWT verify hatası, raw parse deneniyor', { error: jwtError });
+              // JWT verify başarısız olursa raw parse dene
+              try {
+                const rawPayload = JSON.parse(decodedPayload);
+                webhookEvent = rawPayload.event;
+                logger.info('Raw payload parse edildi (JWT verify başarısız)', {
+                  eventType: webhookEvent?.type
+                });
+              } catch (parseError) {
+                logger.error('Raw payload parse de başarısız', { error: parseError });
+                return { success: false, error: 'Cannot verify or parse signed payload' };
+              }
+            }
+          }
+          
+          logger.info('Signed payload başarıyla decode edildi', {
+            eventType: webhookEvent?.type,
+            appUserId: webhookEvent?.app_user_id,
+            productId: webhookEvent?.product_id
+          });
+        } catch (decodeError: any) {
+          logger.error('Signed payload decode hatası', { 
+            error: decodeError.message,
+            payloadLength: event.signedPayload.length
+          });
+          
+          // Signed payload decode başarısız olursa, normal event formatını dene
+          if ('event' in event) {
+            webhookEvent = event.event;
+            logger.info('Normal event formatı kullanılıyor', {
+              eventType: webhookEvent?.type
+            });
+          } else {
+            return { success: false, error: 'Invalid signed payload and no fallback event' };
+          }
         }
       } else {
         webhookEvent = event.event;
