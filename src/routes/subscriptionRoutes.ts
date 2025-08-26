@@ -6,7 +6,11 @@ import {
   changeSubscriptionPlan,
   toggleAutoRenewal,
   getPaymentHistory,
-  cancelSubscription
+  cancelSubscription,
+  createSubscription,
+  cancelSpecificSubscription,
+  getAllSubscriptions,
+  updateExistingSubscriptions
 } from '../controllers/subscriptionController';
 
 const router = express.Router();
@@ -52,5 +56,33 @@ router.get('/payment-history', protect, getPaymentHistory);
  * @access  Private
  */
 router.post('/cancel', protect, cancelSubscription);
+
+/**
+ * @route   POST /api/subscriptions/create
+ * @desc    Yeni abonelik oluşturur
+ * @access  Private
+ */
+router.post('/create', protect, createSubscription);
+
+/**
+ * @route   POST /api/subscriptions/:subscriptionId/cancel
+ * @desc    Belirli bir aboneliği iptal eder
+ * @access  Private
+ */
+router.post('/:subscriptionId/cancel', protect, cancelSpecificSubscription);
+
+/**
+ * @route   GET /api/subscriptions/all
+ * @desc    Kullanıcının tüm aboneliklerini getirir
+ * @access  Private
+ */
+router.get('/all', protect, getAllSubscriptions);
+
+/**
+ * @route   POST /api/subscriptions/update-existing
+ * @desc    Mevcut abonelikleri günceller (test amaçlı)
+ * @access  Private
+ */
+router.post('/update-existing', protect, updateExistingSubscriptions);
 
 export default router; 

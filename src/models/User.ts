@@ -600,14 +600,31 @@ userSchema.pre("save", function (next) {
 
 // Abonelik durumunu güncelleyen hook
 userSchema.pre("save", function (next) {
-  // subscriptionStatus değiştiğinde isSubscriptionActive değerini güncelle
-  if (this.isModified("subscriptionStatus")) {
-    const status = this.subscriptionStatus
-      ? this.subscriptionStatus.trim()
-      : "";
-    this.isSubscriptionActive = status === "active" || status === "trial";
+  // subscriptions array'i değiştiğinde isSubscriptionActive değerini güncelle
+  if (this.isModified("subscriptions") || this.isModified("subscriptionStatus")) {
+    // Önce subscriptions array'indeki aktif aboneliği kontrol et
+    if (this.subscriptions && this.subscriptions.length > 0) {
+      const now = new Date();
+      const activeSubscription = this.subscriptions.find(sub => {
+        // Eğer status cancelled ise, endDate'e bak
+        if (sub.status === "cancelled") {
+          return sub.endDate && now < sub.endDate;
+        }
+        // Diğer durumlar için status'a bak
+        return sub.status === "active" || sub.status === "trial";
+      });
+      
+      this.isSubscriptionActive = !!activeSubscription;
+    } else {
+      // Eski yöntem - subscriptionStatus'a bak
+      const status = this.subscriptionStatus
+        ? this.subscriptionStatus.trim()
+        : "";
+      this.isSubscriptionActive = status === "active" || status === "trial";
+    }
+    
     console.log(
-      `isSubscriptionActive updated to: ${this.isSubscriptionActive} based on status: ${status}`
+      `isSubscriptionActive updated to: ${this.isSubscriptionActive}`
     );
   }
   next();

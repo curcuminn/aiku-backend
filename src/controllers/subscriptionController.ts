@@ -60,6 +60,15 @@ export const getUserSubscription = async (
         user.subscriptionPlan || "startup"
       ];
 
+    // Aktif aboneliği bul
+    const activeSubscription = user.subscriptions?.find(sub => {
+      const now = new Date();
+      if (sub.status === "cancelled") {
+        return sub.endDate && now < sub.endDate;
+      }
+      return sub.status === "active" || sub.status === "trial";
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -74,6 +83,8 @@ export const getUserSubscription = async (
         autoRenewal: user.autoRenewal,
         planDetails: planDetails,
         isSubscriptionActive: user.isSubscriptionActive,
+        activeSubscription: activeSubscription,
+        allSubscriptions: user.subscriptions || [],
       },
     });
   } catch (error: any) {
@@ -386,6 +397,340 @@ export const cancelSubscription = async (
     res.status(500).json({
       success: false,
       message: "Abonelik iptal edilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Yeni abonelik oluşturur (subscriptions array'ine ekler)
+ */
+export const createSubscription = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const { plan, period, amount, transactionId, revenueCatProductId, paymentMethod = "iap" } = req.body;
+
+    if (!plan || !period || !amount || !transactionId || !revenueCatProductId) {
+      return res.status(400).json({
+        success: false,
+        message: "Eksik parametreler",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    const now = new Date();
+    const startDate = now;
+    const lastPaymentDate = now;
+
+    // End date hesaplama
+    let endDate = new Date(now);
+    if (period === "monthly") {
+      endDate.setMonth(endDate.getMonth() + 1);
+    } else {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    }
+
+    // Next payment date (yenileme için)
+    const nextPaymentDate = new Date(endDate);
+
+    // Yeni abonelik objesi
+    const newSubscription = {
+      plan,
+      period,
+      status: "active" as const,
+      startDate,
+      endDate,
+      amount,
+      autoRenewal: true,
+      paymentMethod,
+      lastPaymentDate,
+      nextPaymentDate,
+      transactionId,
+      revenueCatProductId,
+      isActive: true,
+    };
+
+    // Subscriptions array'ine ekle
+    if (!user.subscriptions) {
+      user.subscriptions = [];
+    }
+    user.subscriptions.push(newSubscription);
+
+    // Ana subscription alanlarını da güncelle
+    user.subscriptionStatus = "active";
+    user.subscriptionPlan = plan;
+    user.subscriptionPeriod = period;
+    user.subscriptionAmount = amount;
+    user.subscriptionStartDate = startDate;
+    user.lastPaymentDate = lastPaymentDate;
+    user.nextPaymentDate = nextPaymentDate;
+    user.paymentMethod = paymentMethod;
+    user.autoRenewal = true;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Abonelik başarıyla oluşturuldu",
+      data: {
+        subscription: newSubscription,
+        isSubscriptionActive: user.isSubscriptionActive,
+      },
+    });
+  } catch (error: any) {
+    console.error("Abonelik oluşturma hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Abonelik oluşturulurken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Aboneliği iptal eder (subscriptions array'indeki belirli aboneliği)
+ */
+export const cancelSpecificSubscription = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    const { subscriptionId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    if (!user.subscriptions || user.subscriptions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Aktif abonelik bulunamadı",
+      });
+    }
+
+    // En son aktif aboneliği bul
+    const activeSubscription = user.subscriptions.find(sub => sub.isActive);
+    
+    if (!activeSubscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Aktif abonelik bulunamadı",
+      });
+    }
+
+    // Aboneliği iptal et ama endDate'i koru
+    activeSubscription.status = "cancelled";
+    activeSubscription.autoRenewal = false;
+    // isActive'i endDate'e göre hesapla
+    activeSubscription.isActive = new Date() < activeSubscription.endDate;
+
+    // Ana subscription alanlarını da güncelle
+    user.subscriptionStatus = "cancelled";
+    user.autoRenewal = false;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Abonelik başarıyla iptal edildi",
+      data: {
+        subscription: activeSubscription,
+        isSubscriptionActive: user.isSubscriptionActive,
+      },
+    });
+  } catch (error: any) {
+    console.error("Abonelik iptal etme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Abonelik iptal edilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Kullanıcının tüm aboneliklerini getirir
+ */
+export const getAllSubscriptions = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId).select("subscriptions");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Her aboneliğin isActive durumunu güncelle
+    if (user.subscriptions) {
+      user.subscriptions.forEach(subscription => {
+        subscription.isActive = calculateSubscriptionActive(subscription);
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        subscriptions: user.subscriptions || [],
+        activeSubscription: user.subscriptions?.find(sub => sub.isActive),
+      },
+    });
+  } catch (error: any) {
+    console.error("Abonelikler getirme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Abonelikler alınırken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Aboneliğin aktif olup olmadığını hesaplar
+ */
+function calculateSubscriptionActive(subscription: any): boolean {
+  const now = new Date();
+  
+  // Eğer status cancelled ise, endDate'e bak
+  if (subscription.status === "cancelled") {
+    return now < subscription.endDate;
+  }
+  
+  // Diğer durumlar için status'a bak
+  return subscription.status === "active" || subscription.status === "trial";
+}
+
+/**
+ * Mevcut abonelikleri günceller (test amaçlı)
+ */
+export const updateExistingSubscriptions = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Eğer subscriptions array'i yoksa ve eski subscription alanları varsa
+    if ((!user.subscriptions || user.subscriptions.length === 0) && user.subscriptionStatus) {
+      const now = new Date();
+      
+      // End date hesaplama
+      let endDate = new Date(now);
+      if (user.subscriptionPeriod === "monthly") {
+        endDate.setMonth(endDate.getMonth() + 1);
+      } else if (user.subscriptionPeriod === "yearly") {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      }
+
+      // Eğer nextPaymentDate varsa, onu endDate olarak kullan
+      if (user.nextPaymentDate) {
+        endDate = new Date(user.nextPaymentDate);
+      }
+
+      // Yeni abonelik objesi oluştur
+      const newSubscription = {
+        plan: user.subscriptionPlan || "startup",
+        period: user.subscriptionPeriod || "monthly",
+        status: user.subscriptionStatus,
+        startDate: user.subscriptionStartDate || now,
+        endDate: endDate,
+        amount: user.subscriptionAmount || 0,
+        autoRenewal: user.autoRenewal || false,
+        paymentMethod: user.paymentMethod || "creditCard",
+        lastPaymentDate: user.lastPaymentDate || now,
+        nextPaymentDate: user.nextPaymentDate || endDate,
+        transactionId: "migration-" + Date.now(),
+        revenueCatProductId: `${user.subscriptionPlan || "startup"}_${user.subscriptionPeriod || "monthly"}`,
+        isActive: user.isSubscriptionActive || false,
+      };
+
+      user.subscriptions = [newSubscription];
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Mevcut abonelik başarıyla güncellendi",
+        data: {
+          subscription: newSubscription,
+          isSubscriptionActive: user.isSubscriptionActive,
+        },
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "Zaten güncel abonelik sistemi kullanılıyor",
+        data: {
+          subscriptions: user.subscriptions || [],
+          isSubscriptionActive: user.isSubscriptionActive,
+        },
+      });
+    }
+  } catch (error: any) {
+    console.error("Abonelik güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Abonelik güncellenirken bir hata oluştu",
       error: error.message,
     });
   }
