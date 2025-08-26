@@ -62,11 +62,8 @@ export const getUserSubscription = async (
 
     // Aktif aboneliği bul
     const activeSubscription = user.subscriptions?.find(sub => {
-      const now = new Date();
-      if (sub.status === "cancelled") {
-        return sub.nextPaymentDate && now < sub.nextPaymentDate;
-      }
-      return sub.status === "active" || sub.status === "trial";
+      // isActive alanı zaten doğru hesaplanmış olmalı
+      return sub.isActive;
     });
 
     res.status(200).json({
@@ -553,8 +550,9 @@ export const cancelSpecificSubscription = async (
     // Aboneliği iptal et ama nextPaymentDate'i koru
     activeSubscription.status = "cancelled";
     activeSubscription.autoRenewal = false;
-    // isActive'i nextPaymentDate'e göre hesapla
-    activeSubscription.isActive = new Date() < activeSubscription.nextPaymentDate;
+    // isActive'i nextPaymentDate'e göre hesapla - iptal edilmiş abonelikler için
+    const now = new Date();
+    activeSubscription.isActive = activeSubscription.nextPaymentDate && now < activeSubscription.nextPaymentDate;
 
     // Ana subscription alanlarını da güncelle
     user.subscriptionStatus = "cancelled";
@@ -608,8 +606,18 @@ export const getAllSubscriptions = async (
 
     // Her aboneliğin isActive durumunu güncelle
     if (user.subscriptions) {
+      const now = new Date();
       user.subscriptions.forEach(subscription => {
-        subscription.isActive = calculateSubscriptionActive(subscription);
+        if (subscription.status === "cancelled") {
+          // İptal edilmiş abonelikler için nextPaymentDate'e bak
+          subscription.isActive = subscription.nextPaymentDate && now < subscription.nextPaymentDate;
+        } else if (subscription.status === "active" || subscription.status === "trial") {
+          // Aktif abonelikler için true
+          subscription.isActive = true;
+        } else {
+          // Diğer durumlar için false
+          subscription.isActive = false;
+        }
       });
       await user.save(); // Değişiklikleri kaydet
     }
@@ -619,6 +627,7 @@ export const getAllSubscriptions = async (
       data: {
         subscriptions: user.subscriptions || [],
         activeSubscription: user.subscriptions?.find(sub => sub.isActive),
+        totalActiveCount: user.subscriptions?.filter(sub => sub.isActive).length || 0,
       },
     });
   } catch (error: any) {
@@ -774,9 +783,18 @@ export const fixSubscriptionActiveStatus = async (
     let updated = false;
     user.subscriptions.forEach(subscription => {
       const now = new Date();
-      const shouldBeActive = subscription.status === "cancelled" 
-        ? (subscription.nextPaymentDate && now < subscription.nextPaymentDate)
-        : (subscription.status === "active" || subscription.status === "trial");
+      let shouldBeActive = false;
+      
+      if (subscription.status === "cancelled") {
+        // İptal edilmiş abonelikler için nextPaymentDate'e bak
+        shouldBeActive = subscription.nextPaymentDate && now < subscription.nextPaymentDate;
+      } else if (subscription.status === "active" || subscription.status === "trial") {
+        // Aktif abonelikler için true
+        shouldBeActive = true;
+      } else {
+        // Diğer durumlar için false
+        shouldBeActive = false;
+      }
       
       if (subscription.isActive !== shouldBeActive) {
         subscription.isActive = shouldBeActive;
@@ -801,6 +819,84 @@ export const fixSubscriptionActiveStatus = async (
     res.status(500).json({
       success: false,
       message: "Abonelik düzeltilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Test amaçlı abonelik iptal simülasyonu
+ */
+export const testCancelSubscription = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    if (!user.subscriptions || user.subscriptions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Abonelik bulunamadı",
+      });
+    }
+
+    // En son aktif aboneliği bul
+    const activeSubscription = user.subscriptions.find(sub => sub.isActive);
+    
+    if (!activeSubscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Aktif abonelik bulunamadı",
+      });
+    }
+
+    // Aboneliği iptal et
+    activeSubscription.status = "cancelled";
+    activeSubscription.autoRenewal = false;
+    
+    // isActive'i nextPaymentDate'e göre hesapla
+    const now = new Date();
+    activeSubscription.isActive = activeSubscription.nextPaymentDate && now < activeSubscription.nextPaymentDate;
+
+    // Ana subscription alanlarını da güncelle
+    user.subscriptionStatus = "cancelled";
+    user.autoRenewal = false;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Test abonelik iptal işlemi başarılı",
+      data: {
+        subscription: activeSubscription,
+        isSubscriptionActive: user.isSubscriptionActive,
+        nextPaymentDate: activeSubscription.nextPaymentDate,
+        isActive: activeSubscription.isActive,
+        now: now,
+      },
+    });
+  } catch (error: any) {
+    console.error("Test abonelik iptal hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Test abonelik iptal işlemi başarısız",
       error: error.message,
     });
   }

@@ -605,15 +605,23 @@ userSchema.pre("save", function (next) {
     // Önce subscriptions array'indeki aktif aboneliği kontrol et
     if (this.subscriptions && this.subscriptions.length > 0) {
       const now = new Date();
-      const activeSubscription = this.subscriptions.find(sub => {
-        // Eğer status cancelled ise, nextPaymentDate'e bak
+      
+      // Her aboneliğin isActive durumunu güncelle
+      this.subscriptions.forEach(sub => {
         if (sub.status === "cancelled") {
-          return sub.nextPaymentDate && now < sub.nextPaymentDate;
+          // İptal edilmiş abonelikler için nextPaymentDate'e bak
+          sub.isActive = sub.nextPaymentDate && now < sub.nextPaymentDate;
+        } else if (sub.status === "active" || sub.status === "trial") {
+          // Aktif abonelikler için status'a bak
+          sub.isActive = true;
+        } else {
+          // Diğer durumlar için pasif
+          sub.isActive = false;
         }
-        // Diğer durumlar için status'a bak
-        return sub.status === "active" || sub.status === "trial";
       });
       
+      // En az bir aktif abonelik var mı kontrol et
+      const activeSubscription = this.subscriptions.find(sub => sub.isActive);
       this.isSubscriptionActive = !!activeSubscription;
     } else {
       // Eski yöntem - subscriptionStatus'a bak

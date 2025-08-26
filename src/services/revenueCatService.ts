@@ -359,11 +359,25 @@ class RevenueCatService {
         user.nextPaymentDate = new Date(event.expiration_at_ms);
       }
 
+      // Subscriptions array'indeki aktif aboneliği bul ve güncelle
+      if (user.subscriptions && user.subscriptions.length > 0) {
+        const activeSubscription = user.subscriptions.find((sub: any) => sub.isActive);
+        if (activeSubscription) {
+          activeSubscription.status = 'cancelled';
+          activeSubscription.autoRenewal = false;
+          
+          // isActive'i nextPaymentDate'e göre hesapla
+          const now = new Date();
+          activeSubscription.isActive = activeSubscription.nextPaymentDate && now < activeSubscription.nextPaymentDate;
+        }
+      }
+
       await user.save();
 
       logger.info('IAP abonelik iptal işlendi', {
         userId: user._id,
-        cancelReason: event.cancel_reason
+        cancelReason: event.cancel_reason,
+        nextPaymentDate: user.nextPaymentDate
       });
 
       return { success: true };

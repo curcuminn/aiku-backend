@@ -656,17 +656,24 @@ export const cancelSubscription = async (
       });
     }
 
-    if (!subscription.isActive) {
+    // Aboneliğin gerçekten aktif olup olmadığını kontrol et
+    const now = new Date();
+    const isActuallyActive = subscription.status === "cancelled" 
+      ? (subscription.nextPaymentDate && now < subscription.nextPaymentDate)
+      : (subscription.status === "active" || subscription.status === "trial");
+    
+    if (!isActuallyActive) {
       return res.status(400).json({
         success: false,
-        message: 'Bu abonelik zaten iptal edilmiş'
+        message: 'Bu abonelik zaten iptal edilmiş veya süresi dolmuş'
       });
     }
 
     // Aboneliği iptal et
     subscription.status = 'cancelled';
-    subscription.isActive = false;
     subscription.autoRenewal = false;
+    // isActive'i nextPaymentDate'e göre hesapla - iptal edilmiş abonelikler için
+    subscription.isActive = subscription.nextPaymentDate && now < subscription.nextPaymentDate;
     
     // Eğer bu aktif abonelikse, ana abonelik bilgilerini güncelle
     if (user.subscriptionPlan === subscription.plan && 
@@ -716,7 +723,12 @@ export const cancelSubscription = async (
         period: subscription.period,
         status: subscription.status
       },
-      remainingActiveCount: user.subscriptions?.filter((sub: any) => sub.isActive).length || 0
+      remainingActiveCount: user.subscriptions?.filter((sub: any) => {
+        const isActuallyActive = sub.status === "cancelled" 
+          ? (sub.nextPaymentDate && now < sub.nextPaymentDate)
+          : (sub.status === "active" || sub.status === "trial");
+        return isActuallyActive;
+      }).length || 0
     });
   } catch (error: any) {
     logger.error('Abonelik iptal etme hatası', { error: error.message });
@@ -760,14 +772,25 @@ export const cancelAllSubscriptions = async (
       });
     }
 
-    const cancelledCount = user.subscriptions.filter((sub: any) => sub.isActive).length;
+    const now = new Date();
+    const cancelledCount = user.subscriptions.filter((sub: any) => {
+      const isActuallyActive = sub.status === "cancelled" 
+        ? (sub.nextPaymentDate && now < sub.nextPaymentDate)
+        : (sub.status === "active" || sub.status === "trial");
+      return isActuallyActive;
+    }).length;
 
     // Tüm aktif abonelikleri iptal et
     user.subscriptions.forEach((subscription: any) => {
-      if (subscription.isActive) {
+      const isActuallyActive = subscription.status === "cancelled" 
+        ? (subscription.nextPaymentDate && now < subscription.nextPaymentDate)
+        : (subscription.status === "active" || subscription.status === "trial");
+      
+      if (isActuallyActive) {
         subscription.status = 'cancelled';
-        subscription.isActive = false;
         subscription.autoRenewal = false;
+        // isActive'i nextPaymentDate'e göre hesapla - iptal edilmiş abonelikler için
+        subscription.isActive = subscription.nextPaymentDate && now < subscription.nextPaymentDate;
       }
     });
 

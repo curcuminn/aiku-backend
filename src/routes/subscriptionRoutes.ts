@@ -11,7 +11,8 @@ import {
   cancelSpecificSubscription,
   getAllSubscriptions,
   updateExistingSubscriptions,
-  fixSubscriptionActiveStatus
+  fixSubscriptionActiveStatus,
+  testCancelSubscription
 } from '../controllers/subscriptionController';
 
 const router = express.Router();
@@ -92,5 +93,12 @@ router.post('/update-existing', protect, updateExistingSubscriptions);
  * @access  Private
  */
 router.post('/fix-active-status', protect, fixSubscriptionActiveStatus);
+
+/**
+ * @route   POST /api/subscriptions/test-cancel
+ * @desc    Test amaçlı abonelik iptal simülasyonu
+ * @access  Private
+ */
+router.post('/test-cancel', protect, testCancelSubscription);
 
 export default router; 
