@@ -7,7 +7,10 @@
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc && cp -r uploads dist/",
     "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix"
+    "lint:fix": "eslint . --ext .ts --fix",
+    "migrate:subscriptions": "ts-node src/scripts/migrateSubscriptions.ts",
+    "migrate:subscriptions:check": "ts-node src/scripts/checkMigrationStatus.ts",
+    "test:web-subscription": "ts-node src/scripts/testWebSubscription.ts"
   },
   "keywords": [],
   "author": "",

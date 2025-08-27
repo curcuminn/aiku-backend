@@ -1210,6 +1210,29 @@ export const createOrUpdateSubscription = async (
       });
     }
 
+    // Subscriptions array'ine yeni abonelik ekle
+    const newSubscription = {
+      plan,
+      period,
+      status: user.subscriptionStatus,
+      startDate: user.subscriptionStartDate || now,
+      endDate: nextPaymentDate,
+      amount,
+      autoRenewal: true,
+      paymentMethod: paymentMethod,
+      lastPaymentDate: user.lastPaymentDate || now,
+      nextPaymentDate: nextPaymentDate,
+      transactionId: `web-${Date.now()}-${user._id}`,
+      revenueCatProductId: `${plan}_${period}`,
+      isActive: user.isSubscriptionActive || false,
+    };
+
+    // Subscriptions array'ini başlat ve yeni aboneliği ekle
+    if (!user.subscriptions) {
+      user.subscriptions = [];
+    }
+    user.subscriptions.push(newSubscription);
+
     await user.save();
 
     // Yanıt döndür

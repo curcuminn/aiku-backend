@@ -196,6 +196,31 @@ export const processPayment = async (
     // Abonelik başlangıç tarihini her durumda güncelle
     user.subscriptionStartDate = new Date();
 
+    // Subscriptions array'ine yeni abonelik ekle (sadece başarılı ödemeler için)
+    if (paymentSuccess) {
+      const newSubscription = {
+        plan: user.subscriptionPlan || "subscription",
+        period: user.subscriptionPeriod || "subscription",
+        status: user.subscriptionStatus,
+        startDate: user.subscriptionStartDate,
+        endDate: user.nextPaymentDate,
+        amount: amount || 0,
+        autoRenewal: true,
+        paymentMethod: "creditCard",
+        lastPaymentDate: user.lastPaymentDate,
+        nextPaymentDate: user.nextPaymentDate,
+        transactionId: (paymentResponse && paymentResponse.transactionId) || `web-payment-${Date.now()}-${user._id}`,
+        revenueCatProductId: `${user.subscriptionPlan || "startup"}_${user.subscriptionPeriod || "monthly"}`,
+        isActive: user.isSubscriptionActive || false,
+      };
+
+      // Subscriptions array'ini başlat ve yeni aboneliği ekle
+      if (!user.subscriptions) {
+        user.subscriptions = [];
+      }
+      user.subscriptions.push(newSubscription);
+    }
+
     // Değişiklikleri kaydet
     await user.save();
 
@@ -350,6 +375,29 @@ export const recordFreePayment = async (
       plan: subscriptionPlan || undefined,
       period: subscriptionPeriod,
     });
+
+    // Subscriptions array'ine yeni abonelik ekle
+    const newSubscription = {
+      plan: subscriptionPlan || "startup",
+      period: subscriptionPeriod || "monthly",
+      status: user.subscriptionStatus,
+      startDate: user.subscriptionStartDate,
+      endDate: user.nextPaymentDate,
+      amount: amount || 0,
+      autoRenewal: true,
+      paymentMethod: "creditCard",
+      lastPaymentDate: user.lastPaymentDate,
+      nextPaymentDate: user.nextPaymentDate,
+      transactionId: `free-${Date.now()}-${user._id}`,
+      revenueCatProductId: `${subscriptionPlan || "startup"}_${subscriptionPeriod || "monthly"}`,
+      isActive: user.isSubscriptionActive || false,
+    };
+
+    // Subscriptions array'ini başlat ve yeni aboneliği ekle
+    if (!user.subscriptions) {
+      user.subscriptions = [];
+    }
+    user.subscriptions.push(newSubscription);
 
     // Değişiklikleri kaydet
     await user.save();
