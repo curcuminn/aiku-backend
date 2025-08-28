@@ -222,6 +222,7 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
   - Temel Seviye: 120 saat  
   - İleri Seviye: 80 saat
 - Format: Online (Zoom), ders kayıtları erişilebilir
+- Eğitim başlangıç tarihi: Kasım 2025
 - Staj: 4 hafta
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -260,6 +261,7 @@ Hedef Kazanımlar:
 2) REACT NATIVE DEVELOPER EĞİTİMİ
 ------------------------------------------------
 - Toplam Süre: 90 saat + Proje + Staj + Network
+- Eğitim başlangıç tarihi: Ekim 2025
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta İçi: Pazartesi/Çarşamba/Cuma 19:00–22:00
@@ -317,6 +319,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 100 saat teknik eğitim (6 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 3 hafta
 - Staj Süresi: 3 hafta
+- Eğitim başlangıç tarihi: 29 Ağustos 2025, 20:00
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -348,6 +351,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 140 saat teknik eğitim (10 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 4 hafta
 - Staj Süresi: 4 hafta
+- Eğitim başlangıç tarihi: Ekim 2025
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
