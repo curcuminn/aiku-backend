@@ -102,14 +102,14 @@ async function testWebSubscription() {
 
     // Subscriptions array'ine yeni abonelik ekle
     const newSubscription = {
-      plan,
-      period,
-      status: testUser.subscriptionStatus,
+      plan: plan as "startup" | "business" | "investor",
+      period: period as "monthly" | "yearly",
+      status: testUser.subscriptionStatus as "active" | "pending" | "trial" | "cancelled" | "expired",
       startDate: testUser.subscriptionStartDate || now,
       endDate: nextPaymentDate,
       amount,
       autoRenewal: true,
-      paymentMethod: paymentMethod,
+      paymentMethod: paymentMethod as "creditCard" | "bankTransfer" | "other" | "iap",
       lastPaymentDate: testUser.lastPaymentDate || now,
       nextPaymentDate: nextPaymentDate,
       transactionId: `web-test-${Date.now()}-${testUser._id}`,

@@ -199,16 +199,16 @@ export const processPayment = async (
     // Subscriptions array'ine yeni abonelik ekle (sadece başarılı ödemeler için)
     if (paymentSuccess) {
       const newSubscription = {
-        plan: user.subscriptionPlan || "subscription",
-        period: user.subscriptionPeriod || "subscription",
+        plan: (user.subscriptionPlan || "startup") as "startup" | "business" | "investor",
+        period: (user.subscriptionPeriod || "monthly") as "monthly" | "yearly",
         status: user.subscriptionStatus,
         startDate: user.subscriptionStartDate,
         endDate: user.nextPaymentDate,
         amount: amount || 0,
         autoRenewal: true,
-        paymentMethod: "creditCard",
-        lastPaymentDate: user.lastPaymentDate,
-        nextPaymentDate: user.nextPaymentDate,
+        paymentMethod: "creditCard" as const,
+        lastPaymentDate: user.lastPaymentDate || new Date(),
+        nextPaymentDate: user.nextPaymentDate || new Date(),
         transactionId: (paymentResponse && paymentResponse.transactionId) || `web-payment-${Date.now()}-${user._id}`,
         revenueCatProductId: `${user.subscriptionPlan || "startup"}_${user.subscriptionPeriod || "monthly"}`,
         isActive: user.isSubscriptionActive || false,
@@ -378,15 +378,15 @@ export const recordFreePayment = async (
 
     // Subscriptions array'ine yeni abonelik ekle
     const newSubscription = {
-      plan: subscriptionPlan || "startup",
-      period: subscriptionPeriod || "monthly",
+      plan: (subscriptionPlan || "startup") as "startup" | "business" | "investor",
+      period: (subscriptionPeriod || "monthly") as "monthly" | "yearly",
       status: user.subscriptionStatus,
       startDate: user.subscriptionStartDate,
       endDate: user.nextPaymentDate,
       amount: amount || 0,
       autoRenewal: true,
-      paymentMethod: "creditCard",
-      lastPaymentDate: user.lastPaymentDate,
+      paymentMethod: "creditCard" as const,
+      lastPaymentDate: user.lastPaymentDate || new Date(),
       nextPaymentDate: user.nextPaymentDate,
       transactionId: `free-${Date.now()}-${user._id}`,
       revenueCatProductId: `${subscriptionPlan || "startup"}_${subscriptionPeriod || "monthly"}`,
