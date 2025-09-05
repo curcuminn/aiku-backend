@@ -223,8 +223,8 @@ class OneSignalService {
         tr: `${senderName}: ${message}`
       },
       headings: {
-        en: 'Yeni Mesaj',
-        tr: 'Yeni Mesaj'
+        en: 'New Message',
+        tr: 'New Message'
       },
       data: {
         type: 'chat',
