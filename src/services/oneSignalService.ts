@@ -45,12 +45,12 @@ class OneSignalService {
       const user = await User.findById(userId).select('pushTokens pushNotificationsEnabled');
       
       if (!user || !user.pushNotificationsEnabled) {
-        console.log(`Kullanıcı ${userId} bulunamadı veya push bildirimleri kapalı`);
+        console.log(`Push bildirim atlandı - Kullanıcı: ${userId}, Sebep: ${!user ? 'Kullanıcı bulunamadı' : 'Push bildirimleri kapalı'}`);
         return { success: false, message: 'Kullanıcı bulunamadı veya push bildirimleri kapalı' };
       }
 
       if (!user.pushTokens || user.pushTokens.length === 0) {
-        console.log(`Kullanıcı ${userId} için push token bulunamadı`);
+        console.log(`Push bildirim atlandı - Kullanıcı: ${userId}, Sebep: Push token bulunamadı`);
         return { success: false, message: 'Push token bulunamadı' };
       }
 
@@ -207,6 +207,8 @@ class OneSignalService {
     message: string,
     chatId?: string
   ) {
+    console.log(`Chat bildirimi hazırlanıyor - Alıcı: ${recipientUserId}, Gönderen: ${senderName}, Chat: ${chatId}`);
+    
     const notification = {
       contents: {
         en: `${senderName}: ${message}`,
@@ -227,7 +229,9 @@ class OneSignalService {
       android_sound: 'default'
     };
 
-    return await this.sendToUser(recipientUserId, notification);
+    const result = await this.sendToUser(recipientUserId, notification);
+    console.log(`Chat bildirimi sonucu - Alıcı: ${recipientUserId}, Başarılı: ${result.success}`);
+    return result;
   }
 
   /**

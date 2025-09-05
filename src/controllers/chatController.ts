@@ -6,6 +6,7 @@ import { Company } from "../models/Company";
 import { io } from "../app";
 // import { mailgunService } from '../services/mailgunService';
 import { brevoService } from '../services/brevoService';
+import oneSignalService from '../services/oneSignalService';
 
 interface CustomRequest extends Request {
   company?: {
@@ -449,17 +450,24 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     // 5️⃣ Recipient company ve user bilgisini al
     const recipientCompany = await Company.findById(recipientId)
-      .populate('user', 'email isOnline acceptChatNotification')
+      .populate('user', 'email isOnline acceptChatNotification pushNotificationsEnabled _id')
       .orFail();
 
     // 6️⃣ populated user objesi üzerinden isOnline kontrolü
-    const recipientUser = (recipientCompany.user as any) as { email: string; isOnline: boolean, acceptChatNotification: boolean };
+    const recipientUser = (recipientCompany.user as any) as { 
+      _id: string; 
+      email: string; 
+      isOnline: boolean; 
+      acceptChatNotification: boolean;
+      pushNotificationsEnabled: boolean;
+    };
     if (recipientUser.isOnline === false && recipientUser.acceptChatNotification) {
       // Gönderen şirket adını al
       const senderCompany = await Company.findById(senderId).select('companyName');
       const recipientEmail = recipientUser.email as string;
       const chatUrl = `${process.env.FRONTEND_URL}/chats/${chatSessionId}`;
 
+      // Email bildirimi gönder
       await brevoService.sendChatNotification(recipientEmail, {
         companyName: senderCompany?.companyName || 'Biri',
         content,
@@ -467,7 +475,25 @@ export const sendMessage = async (req: Request, res: Response) => {
       });
     }
 
-    // Mesajı popüle et ve geri dön
+    // Push notification gönder (kullanıcı offline ise ve push notification'ları açıksa)
+    if (recipientUser.isOnline === false && recipientUser.pushNotificationsEnabled) {
+      try {
+        const senderCompany = await Company.findById(senderId).select('companyName');
+        
+        await oneSignalService.sendChatNotification(
+          recipientUser._id,
+          senderCompany?.companyName || 'Biri',
+          content,
+          chatSessionId
+        );
+        
+        console.log(`Push notification gönderildi - Kullanıcı: ${recipientUser._id}, Gönderen: ${senderCompany?.companyName}`);
+      } catch (error) {
+        console.error('Push notification gönderme hatası:', error);
+        logger.error('Push notification gönderme hatası:', error);
+      }
+    }
+
     const populatedMessage = await Message.findById(message._id).populate(
       "sender",
       "companyName companyLogo"
@@ -522,7 +548,6 @@ export const toggleArchiveChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Sohbet oturumunu bul
     const chatSession = await ChatSession.findById(chatSessionId);
 
     if (!chatSession) {
@@ -532,7 +557,6 @@ export const toggleArchiveChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Şirketin bu sohbete erişim izni var mı kontrol et
     if (
       chatSession.initiatorCompany.toString() !== companyId &&
       chatSession.targetCompany.toString() !== companyId
@@ -543,7 +567,6 @@ export const toggleArchiveChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Arşiv durumunu güncelle
     if (chatSession.initiatorCompany.toString() === companyId) {
       chatSession.archivedByInitiator = archive;
     } else {
@@ -580,7 +603,6 @@ export const deleteChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Sohbet oturumunu bul
     const chatSession = await ChatSession.findById(chatSessionId);
 
     if (!chatSession) {
@@ -590,7 +612,6 @@ export const deleteChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Şirketin bu sohbete erişim izni var mı kontrol et
     if (
       chatSession.initiatorCompany.toString() !== companyId &&
       chatSession.targetCompany.toString() !== companyId
@@ -601,14 +622,12 @@ export const deleteChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Silme işlemi (soft delete)
     if (chatSession.initiatorCompany.toString() === companyId) {
       chatSession.deletedByInitiator = true;
     } else {
       chatSession.deletedByTarget = true;
     }
 
-    // Her iki taraf da silerse, mesajları da silebiliriz (opsiyonel)
     if (chatSession.deletedByInitiator && chatSession.deletedByTarget) {
       // Sohbete ait mesajları silmek istiyorsanız bu bloğu aktif edebilirsiniz
       // await Message.deleteMany({ chatSession: chatSessionId });
