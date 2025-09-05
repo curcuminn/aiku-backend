@@ -34,6 +34,11 @@ class OneSignalService {
     this.appId = process.env.ONESIGNAL_APP_ID || '';
     this.apiKey = process.env.ONESIGNAL_REST_API_KEY || '';
     this.baseUrl = 'https://onesignal.com/api/v1';
+    
+    // Debug log
+    console.log('OneSignal Service initialized:');
+    console.log('App ID:', this.appId ? `${this.appId.substring(0, 8)}...` : 'NOT SET');
+    console.log('API Key:', this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'NOT SET');
   }
 
   /**
@@ -62,6 +67,9 @@ class OneSignalService {
         include_player_ids: playerIds,
         ...notification
       };
+
+      // Debug payload
+      console.log('OneSignal payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.post(
         `${this.baseUrl}/notifications`,
