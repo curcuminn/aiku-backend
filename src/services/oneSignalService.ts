@@ -232,7 +232,7 @@ class OneSignalService {
         senderName
       },
       priority: 10,
-      android_channel_id: 'chat',
+      // android_channel_id: 'chat', // OneSignal dashboard'da channel oluşturulana kadar kaldırıldı
       ios_sound: 'default',
       android_sound: 'default'
     };
@@ -265,7 +265,7 @@ class OneSignalService {
         subscriptionType: type
       },
       priority: 8,
-      android_channel_id: 'subscription',
+      // android_channel_id: 'subscription', // OneSignal dashboard'da channel oluşturulana kadar kaldırıldı
       ios_sound: 'default',
       android_sound: 'default'
     };
