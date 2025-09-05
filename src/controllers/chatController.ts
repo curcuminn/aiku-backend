@@ -7,6 +7,7 @@ import { io } from "../app";
 // import { mailgunService } from '../services/mailgunService';
 import { brevoService } from '../services/brevoService';
 import oneSignalService from '../services/oneSignalService';
+import logger from "../config/logger";
 
 interface CustomRequest extends Request {
   company?: {
