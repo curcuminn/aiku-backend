@@ -52,6 +52,7 @@ import academicAiRoutes from "./routes/academicAiRoutes";
 import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRoutes";
 import revenueCatRoutes from "./routes/revenueCatRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
+import reportChatRoutes from "./routes/reportChat";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -657,6 +658,7 @@ app.use("/api/meta", metaConversionsRoutes);
 app.use("/api/modal-messages", modalMessageRoutes);
 app.use("/api/revenuecat", revenueCatRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/report-chat", reportChatRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

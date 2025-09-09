@@ -58,25 +58,6 @@ function smartShorten(text: string, maxWords = 50) {
   return out.trim();
 }
 
-// function ensureFollowUpQuestion(text: string) {
-//   const hasQuestion = /[\?\u061F]$/.test(text.trim());
-//   if (hasQuestion) return text;
-//   const followUps = [
-//     "Ayrıntılı bilgi almak istediğiniz bir konu var mı?",
-//     "Başka neyi merak ediyorsunuz?",
-//     "Size özel hangi detayı konuşalım?",
-//     "Başka neyi merak ediyorsunuz?",
-//     "Şu an aklınıza takılan bir şey var mı?",
-//     "Buradan sonra hangi konuyu konuşalım?",
-//     "Size başka nasıl yardımcı olabilirim?",
-//     "Bir sonraki adımda neyi netleştirelim?",
-//     "İsterseniz farklı bir eğitimi de konuşabiliriz, ne dersiniz?",
-//     "Devamında hangi detayı duymak istersiniz?"
-//   ];
-//   const q = followUps[Math.floor(Math.random() * followUps.length)];
-//   return text.trim() + " " + q;
-// }
-
 dotenv.config();
 
 if (!process.env.GEMINI_API_KEY) {
