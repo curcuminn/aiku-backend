@@ -209,9 +209,9 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
 - Ücretler:
-  - Temel (120s): 50.000 TL
-  - İleri (80s): 40.000 TL
-  - Tam Paket (200s): 85.000 TL
+  - Temel (120s): 90.000 TL
+  - İleri (80s): 60.000 TL
+  - Tam Paket (200s): 140.000 TL
 
 **Temel Seviye (120 Saat) İçerik Dağılımı**
 - Python Fundamentals – 20s
@@ -246,7 +246,7 @@ Hedef Kazanımlar:
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta İçi: Pazartesi/Çarşamba/Cuma 19:00–22:00
-- Ücret: 60.000₺ + KDV
+- Ücret: 90.000₺ + KDV
 
 **Eğitim Kapsamı / Ders Programı**
 - Introduction & React Native Basics
@@ -275,7 +275,7 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: 100.000₺ + KDV
+- Ücret: 140.000₺ + KDV
 
 **Ders Programı / İçerik Başlıkları**
 - Microsoft SQL Server Querying
@@ -337,7 +337,7 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: 60.000₺ + KDV
+- Ücret: 90.000₺ + KDV
 
 **Ders Programı / İçerik Başlıkları**
 - Microsoft SQL Server Query
