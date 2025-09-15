@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { ClaimRequest } from '../models/ClaimRequest';
 import { Company } from '../models/Company';
+import { startStartupTrialIfEligible } from "../services/TrialService";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -119,30 +120,19 @@ export const listClaimRequests = async (req: Request, res: Response) => {
 export const approveClaimRequest = async (req: Request, res: Response) => {
     try {
         requireAdmin(req);
-
         const { id: reqId } = req.params;
         if (!mongoose.Types.ObjectId.isValid(reqId)) {
             return res.status(400).json({ success: false, message: 'Invalid request ID' });
         }
 
         const claim = await ClaimRequest.findById(reqId);
-        if (!claim) {
-            return res.status(404).json({ success: false, message: 'Claim request not found' });
-        }
+        if (!claim) return res.status(404).json({ success: false, message: 'Claim request not found' });
         if (claim.status !== 'Pending') {
-            return res.status(400).json({
-                success: false,
-                message: 'This claim request has already been processed'
-            });
+            return res.status(400).json({ success: false, message: 'This claim request has already been processed' });
         }
 
         const company = await Company.findById(claim.company);
-        if (!company) {
-            return res.status(404).json({
-                success: false,
-                message: 'Associated company not found'
-            });
-        }
+        if (!company) return res.status(404).json({ success: false, message: 'Associated company not found' });
 
         company.user = claim.user;
         await company.save();
@@ -150,16 +140,21 @@ export const approveClaimRequest = async (req: Request, res: Response) => {
         claim.status = 'Approved';
         await claim.save();
 
+        // ✅ Admin onayıyla 6 aylık trial (aboneliği yoksa)
+        const trialResult = await startStartupTrialIfEligible(String(claim.user), {
+            months: 6,
+            source: "admin_approved_claim",
+        });
+
         return res.status(200).json({
             success: true,
             message: 'Claim request approved',
-            claim
+            claim,
+            trial: trialResult,
         });
     } catch (err: any) {
         const status = err.status || 500;
-        return res
-            .status(status)
-            .json({ success: false, message: err.message || 'Server error' });
+        return res.status(status).json({ success: false, message: err.message || 'Server error' });
     }
 };
 

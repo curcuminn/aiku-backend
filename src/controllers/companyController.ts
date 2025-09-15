@@ -6,6 +6,7 @@ import { Company, ICompany } from "../models/Company";
 import mongoose from "mongoose";
 import videoUpload from "../middleware/videoUpload";
 import { User } from '../models/User';
+import { startStartupTrialIfEligible } from "../services/TrialService";
 
 interface CompanyResponse {
   id: string;
@@ -597,56 +598,55 @@ export const claimCompany = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // 1) ID geçerli mi?
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid company ID" });
     }
 
-    // 2) Şirketi al
     const company = await Company.findById(id);
     if (!company) {
       return res.status(404).json({ success: false, message: "Company not found" });
     }
 
-    // 3) Zaten siz misiniz?
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
       return res.status(401).json({ success: false, message: "Token missing" });
     }
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.id;
+
     if (company.user.toString() === userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "You already own this company" });
+      return res.status(400).json({ success: false, message: "You already own this company" });
     }
 
-    // 4) Kullanıcıyı çek (sadece email lazım)
-    const user = await User.findById(userId).select("email");
+    const user = await User.findById(userId).select("email trialEndsAt subscriptionStatus nextPaymentDate");
     if (!user?.email) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 5) Domain’leri karşılaştır
-    const userDomain = user.email.split("@")[1].toLowerCase();
-    const companyDomain = company.companyEmail.split("@")[1]?.toLowerCase();
-    if (userDomain !== companyDomain) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Email domain does not match" });
+    const userDomain = user.email.split("@")[1]?.toLowerCase();
+    const companyDomain = company.companyEmail?.split("@")[1]?.toLowerCase();
+    if (!userDomain || !companyDomain || userDomain !== companyDomain) {
+      return res.status(403).json({ success: false, message: "Email domain does not match" });
     }
 
-    // 6) Atama ve kaydet
+    // Atama
     company.user = userId;
     await company.save();
 
-    res
-      .status(200)
-      .json({ success: true, message: "Company successfully claimed", company });
+    // ✅ Domain claim ile anında 6 aylık trial (aboneliği yoksa)
+    const trialResult = await startStartupTrialIfEligible(String(userId), {
+      months: 6,
+      source: "domain_claim",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Company successfully claimed",
+      company,
+      trial: trialResult, // { applied: boolean, reason?: string, trialEndsAt?: Date }
+    });
   } catch (err: any) {
     console.error("claimCompany error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    return res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 };
