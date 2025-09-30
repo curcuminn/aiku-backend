@@ -13,6 +13,7 @@ import helmet from "helmet";
 import cron from "node-cron";
 import { fetchAndStoreNews } from './controllers/newsController';
 import SubscriptionService from './services/SubscriptionService';
+import DailyUserResetService from './services/DailyUserResetService';
 import { ipBlocker } from './middleware/ipBlocker';
 
 // Route'ları import et
@@ -608,6 +609,19 @@ cron.schedule(SUBSCRIPTION_CRON_SCHEDULE, async () => {
     logger.info('Expire işlemleri sonucu:', { expireResult });
   } catch (err) {
     logger.error('Abonelik cron hatası:', { error: err });
+  }
+});
+
+// Günlük reset cron'u: her gün 00:00
+const DAILY_RESET_CRON_SCHEDULE = process.env.DAILY_RESET_CRON_SCHEDULE || '0 0 * * *';
+
+cron.schedule(DAILY_RESET_CRON_SCHEDULE, async () => {
+  try {
+    logger.info('⏰ Günlük kullanıcı reset cron çalışıyor');
+    await DailyUserResetService.run();
+    logger.info('✅ Günlük kullanıcı reset tamamlandı');
+  } catch (err) {
+    logger.error('Günlük kullanıcı reset cron hatası', { error: err });
   }
 });
 
