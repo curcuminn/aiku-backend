@@ -11,10 +11,10 @@ import httpLogger from "./middleware/httpLogger";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
-import { fetchAndStoreNews } from './controllers/newsController';
-import SubscriptionService from './services/SubscriptionService';
-import DailyUserResetService from './services/DailyUserResetService';
-import { ipBlocker } from './middleware/ipBlocker';
+import { fetchAndStoreNews } from "./controllers/newsController";
+import SubscriptionService from "./services/SubscriptionService";
+import DailyUserResetService from "./services/DailyUserResetService";
+import { ipBlocker } from "./middleware/ipBlocker";
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -40,15 +40,15 @@ import clickTrackRoutes from "./routes/clickTrackRoutes";
 import newsRoutes from "./routes/newsRoutes";
 import panelUserRoutes from "./routes/panelUserRoutes";
 import blogRoutes from "./routes/blogRoutes";
-import investmentNewsRoutes from './routes/investmentNewsRoutes';
+import investmentNewsRoutes from "./routes/investmentNewsRoutes";
 import hubRoutes from "./routes/hubRoutes";
 import claimRequestRoutes from "./routes/claimRequestRoutes";
-import heartbeatRouter from './routes/heartbeat';
+import heartbeatRouter from "./routes/heartbeat";
 import metaConversionsRoutes from "./routes/metaConversionsRoutes";
 import modalMessageRoutes from "./routes/modalMessageRoutes";
 import { ClaimRequest } from "./models/ClaimRequest";
-import { startOfflineUpdater } from './updateOnlineStatus';
-import { User } from './models/User'
+import { startOfflineUpdater } from "./updateOnlineStatus";
+import { User } from "./models/User";
 import academicAiRoutes from "./routes/academicAiRoutes";
 import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRoutes";
 import revenueCatRoutes from "./routes/revenueCatRoutes";
@@ -80,28 +80,30 @@ const whitelist = [
   "http://localhost:3004",
   "http://127.0.0.1:5500",
   "https://bevakpqfycmxnpzrkecv.supabase.co",
-  "https://posws.param.com.tr"
+  "https://posws.param.com.tr",
 ];
 
 // 30 saniyelik eşik
-const OFFLINE_AFTER_MS = 30_000
+const OFFLINE_AFTER_MS = 30_000;
 
 // Her 30 saniyede bir, sonSeen < (NOW - 30s) olanları kapat
-cron.schedule('*/30 * * * * *', async () => {
+cron.schedule("*/30 * * * * *", async () => {
   try {
-    const cutoff = new Date(Date.now() - OFFLINE_AFTER_MS)
+    const cutoff = new Date(Date.now() - OFFLINE_AFTER_MS);
     const result = await User.updateMany(
       { isOnline: true, lastSeen: { $lt: cutoff } },
       { $set: { isOnline: false } }
-    )
+    );
     // Mongoose 6’da UpdateResult.modifiedCount kullanılır
     if (result.modifiedCount && result.modifiedCount > 0) {
-      console.log(`⏱️ ${result.modifiedCount} kullanıcı offline olarak işaretlendi`)
+      console.log(
+        `⏱️ ${result.modifiedCount} kullanıcı offline olarak işaretlendi`
+      );
     }
   } catch (err) {
-    console.error('Offline cron error:', err)
+    console.error("Offline cron error:", err);
   }
-})
+});
 
 // Socket.io sunucusunu oluştur
 const io = new Server(server, {
@@ -477,9 +479,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     },
     user: req.user
       ? {
-        id: req.user.id,
-        email: req.user.email,
-      }
+          id: req.user.id,
+          email: req.user.email,
+        }
       : null,
     timestamp: new Date().toISOString(),
   });
@@ -527,7 +529,7 @@ app.use(
 // Rate limiting ayarları
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 dakika
-  max: process.env.NODE_ENV === 'development' ? Infinity : 750, // Development'da sınırsız, production'da 200
+  max: process.env.NODE_ENV === "development" ? Infinity : 750, // Development'da sınırsız, production'da 200
   message: "Too many requests, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
@@ -540,17 +542,19 @@ const limiter = rateLimit({
       headers: req.headers,
     });
     res.status(429).json({
-      error: "Too many requests, please try again later."
+      error: "Too many requests, please try again later.",
     });
   },
   // Rate limit için IP belirleme fonksiyonu
   keyGenerator: (req: Request) => {
-    return req.headers["x-forwarded-for"]?.toString() ||
+    return (
+      req.headers["x-forwarded-for"]?.toString() ||
       req.headers["x-real-ip"]?.toString() ||
       req.ip ||
       req.connection.remoteAddress ||
-      'unknown';
-  }
+      "unknown"
+    );
+  },
 });
 
 // Tüm route'lara rate limiting uygula
@@ -584,46 +588,51 @@ app.use((req: Request, res: Response, next: any) => {
   next();
 });
 
-const NEWS_FETCH_SCHEDULE = process.env.NEWS_FETCH_CRON_SCHEDULE || '0 3 * * *';
+const NEWS_FETCH_SCHEDULE = "0 3 * * *";
 
 cron.schedule(NEWS_FETCH_SCHEDULE, () => {
   fetchAndStoreNews()
-    .then(() => console.log('Haberler güncellendi'))
-    .catch(err => console.error('Haber çekme hatası:', err));
+    .then(() => console.log("Haberler güncellendi"))
+    .catch((err) => console.error("Haber çekme hatası:", err));
 });
 
-const SUBSCRIPTION_CRON_SCHEDULE = process.env.SUBSCRIPTION_CRON_SCHEDULE || '0 4 * * *'; // her gün 04:00
+const SUBSCRIPTION_CRON_SCHEDULE ="0 4 * * *"; // her gün 04:00
 
 cron.schedule(SUBSCRIPTION_CRON_SCHEDULE, async () => {
   try {
-    logger.info('⏰ Abonelik cron çalışıyor: trial kontrol');
+    logger.info("⏰ Abonelik cron çalışıyor: trial kontrol");
     const trialResult = await SubscriptionService.checkTrialEndingUsers();
-    logger.info('Trial kontrol sonucu:', { trialResult });
+    logger.info("Trial kontrol sonucu:", { trialResult });
 
-    logger.info('⏰ Abonelik cron çalışıyor: periyodik ödeme kontrol');
+    logger.info("⏰ Abonelik cron çalışıyor: periyodik ödeme kontrol");
     const recurringResult = await SubscriptionService.checkRecurringPayments();
-    logger.info('Periyodik ödeme kontrol sonucu:', { recurringResult });
+    logger.info("Periyodik ödeme kontrol sonucu:", { recurringResult });
 
-    logger.info('⏰ Abonelik cron çalışıyor: expire işlemleri');
+    logger.info("⏰ Abonelik cron çalışıyor: expire işlemleri");
     const expireResult = await SubscriptionService.expireEndedSubscriptions();
-    logger.info('Expire işlemleri sonucu:', { expireResult });
+    logger.info("Expire işlemleri sonucu:", { expireResult });
   } catch (err) {
-    logger.error('Abonelik cron hatası:', { error: err });
+    logger.error("Abonelik cron hatası:", { error: err });
   }
 });
 
 // Günlük reset cron'u: her gün 00:00
-const DAILY_RESET_CRON_SCHEDULE = process.env.DAILY_RESET_CRON_SCHEDULE || '0 0 * * *';
+const DAILY_RESET_CRON_SCHEDULE = "0 0 * * *";
+const DAILY_RESET_CRON_TZ = "Europe/Istanbul";
 
-cron.schedule(DAILY_RESET_CRON_SCHEDULE, async () => {
-  try {
-    logger.info('⏰ Günlük kullanıcı reset cron çalışıyor');
-    await DailyUserResetService.run();
-    logger.info('✅ Günlük kullanıcı reset tamamlandı');
-  } catch (err) {
-    logger.error('Günlük kullanıcı reset cron hatası', { error: err });
-  }
-});
+cron.schedule(
+  DAILY_RESET_CRON_SCHEDULE,
+  async () => {
+    try {
+      logger.info("⏰ Günlük kullanıcı reset cron çalışıyor");
+      await DailyUserResetService.run();
+      logger.info("✅ Günlük kullanıcı reset tamamlandı");
+    } catch (err) {
+      logger.error("Günlük kullanıcı reset cron hatası", { error: err });
+    }
+  },
+  { timezone: DAILY_RESET_CRON_TZ }
+);
 
 // MongoDB bağlantısı
 mongoose
@@ -663,10 +672,10 @@ app.use("/api/click", clickTrackRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/panel-users", panelUserRoutes);
-app.use('/api/investment-news', investmentNewsRoutes);
+app.use("/api/investment-news", investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
-app.use('/api/heartbeat', heartbeatRouter);
+app.use("/api/heartbeat", heartbeatRouter);
 app.use("/api/idea-favorites", startupIdeaFavoriteCountRoutes);
 app.use("/api/meta", metaConversionsRoutes);
 app.use("/api/modal-messages", modalMessageRoutes);
