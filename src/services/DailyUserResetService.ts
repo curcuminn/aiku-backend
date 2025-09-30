@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import logger from "../config/logger";
+import { MongoClient } from "mongodb";
 
 /**
  * Günlük kullanıcı alan resetleri
@@ -11,17 +12,41 @@ import logger from "../config/logger";
  * - spinCount: 1, lastSpinDate: []
  */
 export default class DailyUserResetService {
+  /**
+   * Ayrı bir Mongo bağlantısı gerekiyorsa env üzerinden bağlanır.
+   * Env yoksa mevcut mongoose bağlantısını kullanır.
+   */
   static async run(): Promise<void> {
-    const connection = mongoose.connection;
-    const db = connection.db;
-    if (!db) {
-      logger.error("MongoDB bağlantısı mevcut değil (db null). Cron atlanıyor.");
-      return;
-    }
+    const externalUri = process.env.DAILY_RESET_MONGO_URI;
+    const externalDbName =  "aloha-prod";
+    const collectionName =  "users";
 
-    const users = db.collection("users");
+    let externalClient: MongoClient | undefined;
+    const useExternal = Boolean(externalUri);
 
     try {
+      const db = await (async () => {
+        if (useExternal && externalUri) {
+          externalClient = new MongoClient(externalUri, {
+            // Node mongodb v5+ artık useNewUrlParser/useUnifiedTopology gerektirmez
+          });
+          await externalClient.connect();
+          logger.info("Daily reset: external MongoDB connected", {
+            dbName: externalDbName,
+          });
+          return externalClient.db(externalDbName);
+        }
+
+        const mongooseDb = mongoose.connection.db;
+        if (!mongooseDb) {
+          throw new Error("Mongoose connection has no db. Provide DAILY_RESET_MONGO_URI");
+        }
+        logger.info("Daily reset: using existing Mongoose connection");
+        return mongooseDb;
+      })();
+
+      const users = db.collection(collectionName);
+
       // 1) ResetFreeUsages
       const resFree = await users.updateMany(
         { hasFreeUsage: false },
@@ -51,6 +76,15 @@ export default class DailyUserResetService {
       logger.info("Daily reset: spin count set", { modified: resSpin.modifiedCount });
     } catch (err) {
       logger.error("DailyUserResetService error", { error: err });
+    } finally {
+      if (externalClient) {
+        try {
+          await externalClient.close();
+          logger.info("Daily reset: external MongoDB disconnected");
+        } catch (e) {
+          logger.warn("Daily reset: error closing external MongoDB", { error: e });
+        }
+      }
     }
   }
 }
