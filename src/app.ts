@@ -54,6 +54,7 @@ import startupIdeaFavoriteCountRoutes from "./routes/startupIdeaFavoriteCountRou
 import revenueCatRoutes from "./routes/revenueCatRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import reportChatRoutes from "./routes/reportChat";
+import trainingApplicationRoutes from "./routes/trainingApplicationRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -479,9 +480,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     },
     user: req.user
       ? {
-          id: req.user.id,
-          email: req.user.email,
-        }
+        id: req.user.id,
+        email: req.user.email,
+      }
       : null,
     timestamp: new Date().toISOString(),
   });
@@ -596,7 +597,7 @@ cron.schedule(NEWS_FETCH_SCHEDULE, () => {
     .catch((err) => console.error("Haber çekme hatası:", err));
 });
 
-const SUBSCRIPTION_CRON_SCHEDULE ="0 4 * * *"; // her gün 04:00
+const SUBSCRIPTION_CRON_SCHEDULE = "0 4 * * *"; // her gün 04:00
 
 cron.schedule(SUBSCRIPTION_CRON_SCHEDULE, async () => {
   try {
@@ -682,6 +683,7 @@ app.use("/api/modal-messages", modalMessageRoutes);
 app.use("/api/revenuecat", revenueCatRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/report-chat", reportChatRoutes);
+app.use("/api/training-applications", trainingApplicationRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
