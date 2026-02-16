@@ -69,6 +69,21 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export class GeminiAcademicService {
   private chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
+  private async withRetry<T>(fn: () => Promise<T>, retries = 3, backoff = 1000): Promise<T> {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isRetryable = error.status === 429 || error.status === 503 || error.message?.includes("busy");
+
+      if (isRetryable && retries > 0) {
+        console.warn(`⚠️ Gemini yoğun. Deneme: ${retries}`);
+        await delay(backoff);
+        return this.withRetry(fn, retries - 1, backoff + 1000);
+      }
+      throw error;
+    }
+  }
+
   /**
    * Akademik ortam için özel prompt ile chat fonksiyonu
    * @param message Kullanıcıdan gelen mesaj
@@ -76,6 +91,9 @@ export class GeminiAcademicService {
    * @returns AI'den gelen yanıt ve güncellenmiş konuşma geçmişi
    */
   async chatAcademic(message: string, conversationHistory: any[] = []): Promise<{ response: string; conversationHistory: any[] }> {
+    let updatedHistory = [...conversationHistory];
+    const finalUserMsg = message;
+
     try {
       // Akademik ortam için sistem talimatı
       const academicSystemInstructions = `
@@ -103,10 +121,10 @@ SOHBET BAŞLANGICI (SADECE İLK MESAJDA)
 - İlk mesajında mutlaka "Merhaba, ben Ezgi" gibi kendini tanıtarak başla.
 - Sadece ilk mesajda hal hatır sorabilirsin, sonraki mesajlarda tekrar "Nasılsın?", "Günün nasıl geçiyor?" gibi ifadeleri tekrarlama. Her mesajda yeni bir karşılama veya hal hatır sorma cümlesi kullanma.
 - Maksimum 2 cümle, 30 kelimeyi geçme.
-- **Aşama 1:** İlk mesajda **sadece** isim sor:  
+- **Aşama 1:** İlk mesajda **sadece** isim sor:  
     “Merhaba! İsminizi veya size nasıl hitap edebileceğimi öğrenebilir miyim?”
-- **Aşama 2 (mutlaka):** Kullanıcı isim ve hitap biçimini ilettiyse, **sadece** şu soruyu sor ve başka hiçbir şey ekleme:  
-    “Öğrenci misiniz yoksa mezun mu ve hangi alanda deneyiminiz var?”  
+- **Aşama 2 (mutlaka):** Kullanıcı isim ve hitap biçimini ilettiyse, **sadece** şu soruyu sor ve başka hiçbir şey ekleme:  
+    “Öğrenci misiniz yoksa mezun mu ve hangi alanda deneyiminiz var?”  
 - **Kesinlikle** aşama 2 sorusu sorulmadan hiçbir eğitim önerisi yapma veya başka konuya geçme.
 
 SOHBET GEÇMİŞİ VE KİŞİSELLEŞTİRME
@@ -116,8 +134,7 @@ SOHBET GEÇMİŞİ VE KİŞİSELLEŞTİRME
 
 ÜSLUP & STİL
 - Profesyonel ama samimi, doğal konuş. Mesajlaşma dilinde günlük bir üslup kullan; imla ve noktalama kurallarına dikkat et.
-- **KIRMIZI ÇİZGİ: Uzun paragraflardan kaçın; 2–3 kısa cümle kullan. Önemli sorularda (staj, program saatleri vs.) 3. cümleye kadar detay verebilirsin. Son cümleye mutlaka anlamlı bir soru ekle.** 
-- Madde işareti, numaralı liste, tablo, başlık, tire/•/* gibi işaretlerle satır başlatmak yasak.**
+- **KIRMIZI ÇİZGİ: Uzun paragraflardan kaçın; 2–3 kısa cümle kullan. Önemli sorularda (staj, program saatleri vs.) 3. cümleye kadar detay verebilirsin. Son cümleye mutlaka anlamlı bir soru ekle.** - Madde işareti, numaralı liste, tablo, başlık, tire/•/* gibi işaretlerle satır başlatmak yasak.**
 - Emoji kullanabilirsin ama az ve yerinde olsun.
 - Uzun uzun, paragraf gibi cevaplar verme. İnsanlar gibi kısa, sıcak ve içten cevaplar ver.
 - **SADECE YAZILIM:** Hiçbir koşulda dijital pazarlama, sosyal medya, web tasarımı vb. kursları önermeyeceksin; sadece Yazılım eğitimleri (Front‑End, Back‑End, Full‑Stack) hakkında konuş.
@@ -205,8 +222,8 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
 ------------------------------------------------
 1) YAPAY ZEKA DEVELOPER EĞİTİMİ
 ------------------------------------------------
-- Toplam Süre: 200 saat  
-  - Temel Seviye: 120 saat  
+- Toplam Süre: 200 saat  
+  - Temel Seviye: 120 saat  
   - İleri Seviye: 80 saat
 - Format: Online (Zoom), ders kayıtları erişilebilir
 - Eğitim başlangıç tarihi: Ocak 2026
@@ -312,8 +329,8 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: 60.000₺ + KDV  
-  → Şu anda öğrencilere özel %50 indirimli fiyatla kayıt alınmaktadır.  
+- Ücret: 60.000₺ + KDV  
+  → Şu anda öğrencilere özel %50 indirimli fiyatla kayıt alınmaktadır.  
   → Ayrıca 12 aya kadar taksit imkânı sunulmaktadır.
 
 **Ders Programı / İçerik Başlıkları**
@@ -400,70 +417,19 @@ KURALLAR
 Şimdi bu kurallara göre, kullanıcının mesajına en uygun cevabı ver.
 `;
 
-      let updatedHistory = [...conversationHistory];
-      const finalUserMsg = message;
-
-      if (updatedHistory.length === 0) {
-        const chat = this.chatModel.startChat({
-          systemInstruction: {
-            role: "system",
-            parts: [{ text: academicSystemInstructions }]
-          },
-          generationConfig: {
-            temperature: 0.3,
-            topK: 40,
-            topP: 0.9,
-            maxOutputTokens: 200,
-          },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
-          ]
-        });
-
-        // await chat.sendMessage(academicSystemInstructions);
-
-        const result = await chat.sendMessage(finalUserMsg);
-        const rawResponse = await result.response;
-        const raw = typeof rawResponse?.text === "function"
-          ? rawResponse.text()
-          : "Yanıt alınamadı.";
-        console.log("🧪 İlk mesaj raw:", raw);
-
-        let cleaned = stripExternalLinks(deBullet(raw));
-        if (wordCount(cleaned) > 80) {
-          cleaned = smartShorten(cleaned, 50);
-        }
-        // cleaned = ensureFollowUpQuestion(cleaned);
-        if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
-          cleaned += `\n\n${CONTACT_SNIPPET}`;
-        }
-
-        const kelimeSayisi = wordCount(cleaned);
-        const gecikmeMs = Math.min(5000, kelimeSayisi * 70);
-        await delay(gecikmeMs);
-
-        updatedHistory = [
-          { role: "user", content: academicSystemInstructions },
-          { role: "model", content: "(context set)" },
-          { role: "user", content: finalUserMsg },
-          { role: "model", content: cleaned }
-        ];
-
-        return { response: cleaned, conversationHistory: updatedHistory };
-      }
+      const apiHistory = updatedHistory
+        .filter(item => item.role === "user" || item.role === "model")
+        .map(item => ({
+          role: item.role,
+          parts: [{ text: item.content }]
+        }));
 
       const chat = this.chatModel.startChat({
         systemInstruction: {
           role: "system",
           parts: [{ text: academicSystemInstructions }]
         },
-        history: updatedHistory.map(item => ({
-          role: item.role,
-          parts: [{ text: item.content }]
-        })),
+        history: apiHistory,
         generationConfig: {
           temperature: 0.3,
           topK: 40,
@@ -478,26 +444,32 @@ KURALLAR
         ]
       });
 
-      const result = await chat.sendMessage(finalUserMsg);
+      const result = await this.withRetry(() => chat.sendMessage(finalUserMsg));
+
       const rawResponse = await result.response;
       const raw = typeof rawResponse?.text === "function"
         ? rawResponse.text()
         : "Yanıt alınamadı.";
+
       console.log("🧪 Gemini yanıtı (raw):", raw);
+
       let cleaned = stripExternalLinks(deBullet(raw));
       if (wordCount(cleaned) > 80) {
         cleaned = smartShorten(cleaned, 50);
       }
-      // cleaned = ensureFollowUpQuestion(cleaned);
+
       if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
         cleaned += `\n\n${CONTACT_SNIPPET}`;
       }
-      
 
       const kelimeSayisi = wordCount(cleaned);
       const gecikmeMs = Math.min(5000, kelimeSayisi * 70);
       await delay(gecikmeMs);
 
+      if (updatedHistory.length === 0) {
+        updatedHistory.push({ role: "user", content: academicSystemInstructions });
+        updatedHistory.push({ role: "model", content: "(context set)" });
+      }
 
       updatedHistory.push({ role: "user", content: finalUserMsg });
       updatedHistory.push({ role: "model", content: cleaned });
@@ -505,8 +477,22 @@ KURALLAR
       return { response: cleaned, conversationHistory: updatedHistory };
 
     } catch (error) {
-      console.error("Akademik chat hatası:", error);
-      throw new Error(`Akademik chat sırasında hata oluştu: ${(error as Error).message}`);
+      console.error("❌ Akademik chat kritik hata:", error);
+
+      const errorMsg = "Şu an çok yoğunum, mesajını aldım ama yanıtlamam biraz zaman alıyor. Lütfen birkaç saniye sonra tekrar dener misin? 😊";
+
+      if (updatedHistory.length === 0) {
+        updatedHistory.push({ role: "user", content: "(system init on error)" });
+        updatedHistory.push({ role: "model", content: "(context set on error)" });
+      }
+
+      updatedHistory.push({ role: "user", content: finalUserMsg });
+      updatedHistory.push({ role: "model", content: errorMsg });
+
+      return {
+        response: errorMsg,
+        conversationHistory: updatedHistory
+      };
     }
   }
-} 
+}
