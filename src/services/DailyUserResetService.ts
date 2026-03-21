@@ -48,11 +48,13 @@ export default class DailyUserResetService {
       const users = db.collection(collectionName);
 
       // 1) ResetFreeUsages
+      /*
       const resFree = await users.updateMany(
         { hasFreeUsage: false },
         { $set: { hasFreeUsage: true } }
       );
       logger.info("Daily reset: hasFreeUsage set true", { modified: resFree.modifiedCount });
+      */
 
       // 2) ResetWatchedAds
       const resAds = await users.updateMany(
