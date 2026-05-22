@@ -6,7 +6,7 @@ Bu dokümantasyon, RevenueCat entegrasyonu ile birden fazla abonelik yönetimi i
 
 ## 🔗 Base URL
 ```
-https://api.aikuaiplatform.com/api/revenuecat
+https://api.aikuaihub.com/api/revenuecat
 ```
 
 ## 🔐 Authentication

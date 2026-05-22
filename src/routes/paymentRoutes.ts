@@ -393,7 +393,7 @@ router.post("/callback", async (req: Request, res: Response) => {
 
     // Sonuca göre frontend'e yönlendir
     const frontendUrl =
-      process.env.FRONTEND_URL || "https://aikuaiplatform.com";
+      process.env.FRONTEND_URL || "https://aikuaihub.com";
     const redirectUrl = `${frontendUrl}/payment/callback?status=${
       result.TURKPOS_RETVAL_Sonuc === 1 ? "success" : "error"
     }&data=${encodeURIComponent(JSON.stringify(result))}`;
@@ -409,7 +409,7 @@ router.post("/callback", async (req: Request, res: Response) => {
 
     // Hata durumunda frontend'e yönlendir
     const frontendUrl =
-      process.env.FRONTEND_URL || "https://aikuaiplatform.com";
+      process.env.FRONTEND_URL || "https://aikuaihub.com";
     res.redirect(
       `${frontendUrl}/payment/callback?status=error&message=${encodeURIComponent(
         (error as Error).message

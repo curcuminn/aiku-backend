@@ -8,7 +8,7 @@ Fatura bilgileri API'si, kullanıcıların bireysel veya kurumsal fatura bilgile
 
 ## Endpoint URL
 
-Tüm fatura bilgileri API'leri için temel URL: `https://api.aikuaiplatform.com/api/billing-info`
+Tüm fatura bilgileri API'leri için temel URL: `https://api.aikuaihub.com/api/billing-info`
 
 ## Kimlik Doğrulama
 
@@ -366,7 +366,7 @@ Belirli bir fatura bilgisini siler.
 // Fatura bilgisi formu örneği
 const addBillingInfo = async (formData) => {
   try {
-    const response = await fetch('https://api.aikuaiplatform.com/api/billing-info', {
+    const response = await fetch('https://api.aikuaihub.com/api/billing-info', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -397,7 +397,7 @@ const addBillingInfo = async (formData) => {
 // Kullanıcının tüm fatura bilgilerini getirme
 const getBillingInfos = async () => {
   try {
-    const response = await fetch('https://api.aikuaiplatform.com/api/billing-info', {
+    const response = await fetch('https://api.aikuaihub.com/api/billing-info', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${userToken}`

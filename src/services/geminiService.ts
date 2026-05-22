@@ -1370,10 +1370,10 @@ Instagram: ${companyData.companyInstagram}
       // Aiku platform information
       const aikuWebsiteInfo = {
         "companyName": "Aiku AI Startup Platform",
-        "companyLogo": "https://aikuaiplatform.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
-        "companyEmail": "info@aikuaiplatform.com",
+        "companyLogo": "https://aikuaihub.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
+        "companyEmail": "info@aikuaihub.com",
         "companyPhone": "+90 850 757 94",
-        "companyWebsite": "https://aikuaiplatform.com",
+        "companyWebsite": "https://aikuaihub.com",
         "companyAddress": "",
         "companyInfo": "Aiku AI Startup Platform brings together AI startup products. The platform serves as a central hub for various AI solutions. It positions itself within the AI startup ecosystem.",
         "detailedDescription": "Aiku AI Startup Platform is designed to aggregate AI startup products into a single, accessible platform, streamlining the discovery and integration of emerging AI technologies.\n\nThe platform simplifies access to a diverse range of AI tools and services, catering to individuals and organizations looking to leverage innovative AI solutions.\n\nBy centralizing these products, Aiku AI aims to reduce the complexities of navigating the fragmented AI market, making it easier for users to find and implement the AI solutions they need.\n\nAiku AI Startup Platform focuses on providing a convenient and efficient way to explore the AI landscape, facilitating collaboration and innovation within the AI startup community.",
@@ -1385,7 +1385,7 @@ Instagram: ${companyData.companyInstagram}
         "companyTwitter": "",
         "companyInstagram": "https://www.instagram.com/aikuai_platform/",
         "productName": "Aiku AI Startup Platform",
-        "productLogo": "https://aikuaiplatform.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
+        "productLogo": "https://aikuaihub.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
         "productCategory": "AI Platform",
         "productDescription": "Aiku AI Startup Platform brings together AI startup products, offering a centralized hub for various AI solutions.",
         "tags": [
@@ -1414,7 +1414,7 @@ Instagram: ${companyData.companyInstagram}
         "pricingModel": "",
         "releaseDate": "",
         "productPrice": 0,
-        "productWebsite": "https://aikuaiplatform.com",
+        "productWebsite": "https://aikuaihub.com",
         "productLinkedIn": "https://www.linkedin.com/company/aiku-ai-platform/",
         "productTwitter": ""
       };
@@ -1486,7 +1486,7 @@ All active subscribers (Startup, Business, Investor) gain:
 
 5. **Support & Resources**  
    – Blog articles, customer success stories, video tutorials.  
-   – Dedicated support team reachable at info@aikuaiplatform.com or +90 850 757 94.  
+   – Dedicated support team reachable at info@aikuaihub.com or +90 850 757 94.  
 
 “If you’re exploring Sam Altman’s ‘one person — one billion dollar company’ vision, our August 2025 report (published from Zug with Aiku’s contributions) outlines the feasibility window (≈4–9 years), key cultural/financial/regulatory drivers, and 50 AI-powered startup ideas. It’s free on our website, and I can summarize or recommend ideas by sector.”
 
@@ -1504,7 +1504,7 @@ All active subscribers (Startup, Business, Investor) gain:
   – Host strategy guidebooks for AI startups prepared by leading technology companies. 
 
 • **One-Person, One-Billion Company Report** (also: “One Person – One Billion Dollar Company”)
-  – Access: Free on Aiku’s site → https://aikuaiplatform.com/startup-ideas
+  – Access: Free on Aiku’s site → https://aikuaihub.com/startup-ideas
   – Release: **August 2025**, published out of **Zug, Switzerland**; prepared with **Aiku’s contributions**. Led by **Engin Çağlar** (Innovation & Marketing Strategist).
   – What it is: An in-depth analysis of **Sam Altman’s 2023 “one person — one billion dollar company” vision** + a **roadmap** that includes **50 AI-powered startup ideas** vetted as high-potential concepts for solo founders and lean teams.
   – Feasibility: Billion-dollar impact units may emerge within **4–9 years** as AI replaces traditional departmental scale with **operators, planners, and autonomous agents**.
@@ -1520,8 +1520,8 @@ All active subscribers (Startup, Business, Investor) gain:
   – Quote (context): Aiku CEO **Orkide Ercüment, PhD C.** highlights Switzerland’s tech/finance hub role and the report’s international, data-driven preparation, emphasizing upskilling teams via AI education and strategic investment. 
 
 === CONTACT & SOCIAL ===
-Website: https://aikuaiplatform.com  
-Email: info@aikuaiplatform.com  
+Website: https://aikuaihub.com  
+Email: info@aikuaihub.com  
 Phone: +90 850 757 94  
 LinkedIn: https://www.linkedin.com/company/aiku-ai-platform/  
 Instagram: https://www.instagram.com/aikuai_platform/  
@@ -1533,10 +1533,10 @@ Instagram: https://www.instagram.com/aikuai_platform/
 - If a question falls outside the platform’s scope, politely redirect back to available features and workflows.  
 
 === LINKING RULES ===
-- When the user asks about the “One Person — One Billion Dollar Company” report, the 50 startup ideas, or “startup ideas”, ALWAYS include this canonical link: https://aikuaiplatform.com/startup-ideas
+- When the user asks about the “One Person — One Billion Dollar Company” report, the 50 startup ideas, or “startup ideas”, ALWAYS include this canonical link: https://aikuaihub.com/startup-ideas
 - Prefer short, readable anchor text. Examples:
-  • “View the report and the 50 ideas here: https://aikuaiplatform.com/startup-ideas”
-  • If Markdown is supported: [View the report & 50 ideas](https://aikuaiplatform.com/startup-ideas)
+  • “View the report and the 50 ideas here: https://aikuaihub.com/startup-ideas”
+  • If Markdown is supported: [View the report & 50 ideas](https://aikuaihub.com/startup-ideas)
 - If the user is in Turkish, you may localize the anchor text (e.g., “Raporu ve 50 fikri burada inceleyin”), but keep the same URL.
 
 Now, please respond to the user’s request or question using this complete context.`;

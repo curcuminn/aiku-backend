@@ -80,7 +80,7 @@ class ParamPosService {
     this.baseUrl =
       process.env.PARAM_BASE_URL ||
       "https://posws.param.com.tr/turkpos.ws/service_turkpos_prod.asmx";
-    this.successUrl = process.env.PARAM_SUCCESS_URL || "https://aikuaiplatform.com/payment";
+    this.successUrl = process.env.PARAM_SUCCESS_URL || "https://aikuaihub.com/payment";
     this.errorUrl = process.env.PARAM_ERROR_URL || "https://aiku.com.tr/payment/error";
 
     if (

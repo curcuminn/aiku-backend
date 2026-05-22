@@ -71,9 +71,9 @@ app.set("trust proxy", 1); // Sadece bir proxy'ye güven
 
 // CORS için izin verilen domainler
 const whitelist = [
-  "https://aikuaiplatform.com",
-  "https://www.aikuaiplatform.com",
-  "https://api.aikuaiplatform.com",
+  "https://aikuaihub.com",
+  "https://www.aikuaihub.com",
+  "https://api.aikuaihub.com",
   "https://www.alohadijital.com",
   "https://alohadijital.com",
   "http://localhost:3000",
@@ -208,7 +208,7 @@ const corsOriginCheck = (
 
   // Wildcard subdomain kontrolü
   const isAikuDomain = origin.match(
-    /^https:\/\/([a-zA-Z0-9-]+\.)?aikuaiplatform\.com$/
+    /^https:\/\/([a-zA-Z0-9-]+\.)?aikuaihub\.com$/
   );
   if (isAikuDomain) {
     callback(null, true);
@@ -518,7 +518,7 @@ app.use(
       scriptSrc: ["'self'", "'unsafe-inline'", "accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.aikuaiplatform.com"],
+      connectSrc: ["'self'", "https://api.aikuaihub.com"],
       fontSrc: ["'self'", "https:", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],

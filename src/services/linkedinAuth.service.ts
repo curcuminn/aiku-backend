@@ -15,7 +15,7 @@ class LinkedInAuthService {
       redirectURI = 'com.aikumobile://auth/linkedin-callback';
       console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Auth] Mobil platform için redirect URI:', redirectURI);
     } else {
-      redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
+      redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaihub.com/auth/social-callback';
       console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Auth] Web platform için redirect URI:', redirectURI);
     }
     
@@ -40,7 +40,7 @@ class LinkedInAuthService {
     try {
       console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Token] Token alınmaya çalışılıyor. Code:', code);
       
-      const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
+      const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaihub.com/auth/social-callback';
       const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
       const linkedInClientSecret = process.env.LINKEDIN_CLIENT_SECRET;
       

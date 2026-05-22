@@ -22,5 +22,5 @@ Bu dokümantasyonlar, AIKU API projesi ile çalışan frontend geliştiricileri,
 ## Teknik Sorular ve Destek
 
 Teknik sorular ve destek için, lütfen issue açın veya ekibimize şu adreslerden ulaşın:
-- Email: destek@aikuaiplatform.com
+- Email: destek@aikuaihub.com
 - Slack: #aiku-tech-support kanalı

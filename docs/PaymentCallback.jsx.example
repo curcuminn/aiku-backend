@@ -52,7 +52,7 @@ function PaymentCallback() {
       setError(message || 'Ödeme işlemi sırasında bir hata oluştu.');
     } else {
       // Eğer status ve data yoksa, backend'e yönlendir
-      const apiUrl = 'https://api.aikuaiplatform.com/api/payments/callback';
+      const apiUrl = 'https://api.aikuaihub.com/api/payments/callback';
       window.location.href = apiUrl;
     }
   }, [location, navigate]);
