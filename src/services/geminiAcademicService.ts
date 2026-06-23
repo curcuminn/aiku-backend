@@ -61,7 +61,7 @@ export class GeminiAcademicService {
   private apiKey = process.env.GEMINI_API_KEY;
 
   private async callGeminiAPI(message: string, history: any[], systemPrompt: string, retryCount = 0): Promise<string> {
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
     const maxRetries = 3;
     const baseDelay = 2000;
 
@@ -87,18 +87,24 @@ export class GeminiAcademicService {
     const body = {
       contents,
       generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 250, 
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+        thinkingConfig: {
+          thinkingLevel: "LOW"
+        }
       }
     };
 
     try {
-      const response = await axios.post(`${url}?key=${this.apiKey}`, body, {
+      const response = await axios.post(url, body, {
         timeout: 30000,
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
+          "x-goog-api-key": this.apiKey
         }
       });
+
+      console.log("🧪 Gemini full response:", JSON.stringify(response.data, null, 2));
 
       if (!response.data.candidates || !response.data.candidates[0] || !response.data.candidates[0].content) {
         throw new Error('API yanıtı beklenen formatta değil');
@@ -232,7 +238,7 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
   - Temel Seviye: 120 saat  
   - İleri Seviye: 80 saat
 - Format: Online (Zoom), ders kayıtları erişilebilir
-- Eğitim başlangıç tarihi: Ocak 2026
+- Eğitim başlangıç tarihi: Temmuz 2026
 - Staj: 4 hafta
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -270,7 +276,7 @@ Hedef Kazanımlar:
 ------------------------------------------------
 2) REACT NATIVE DEVELOPER EĞİTİMİ
 - Toplam Süre: 90 saat + Proje + Staj + Network
-- Eğitim başlangıç tarihi: Ocak 2026
+- Eğitim başlangıç tarihi: Temmuz 2026
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta İçi: Pazartesi/Çarşamba/Cuma 19:00–22:00
@@ -298,7 +304,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 100 saat teknik eğitim (6 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 3 hafta
 - Staj Süresi: 3 hafta
-- Eğitim başlangıç tarihi: Ocak 2026
+- Eğitim başlangıç tarihi: Temmuz 2026
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -328,7 +334,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 120 saat teknik eğitim (10 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 4 hafta
 - Staj Süresi: 4 hafta
-- Eğitim başlangıç tarihi: Ocak 2026
+- Eğitim başlangıç tarihi: Temmuz 2026
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -348,6 +354,34 @@ Hedef Kazanımlar:
 - Modern back-end API geliştirme, veri erişimi ve katmanlı mimari
 - Proje ve stajla gerçek dünya tecrübesi
 
+------------------------------------------------
+5) FULL STACK DEVELOPER EĞİTİMİ
+- Toplam Süre: 240 saat teknik eğitim (16 hafta, haftada 4 gün)
+- Proje & Staj: 5 hafta Proje + 5 hafta Aloha Dijital bünyesinde Staj
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
+- Format: Online (Zoom), ders kayıtları erişilebilir
+- Saatler:
+  - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
+  - Hafta İçi: Salı/Perşembe 19:00–22:00
+- Ücret: 140.000₺ + KDV
+
+**Ders Programı / İçerik Başlıkları**
+- Software, Windows & .NET Development Fundamentals
+- C# & Object Oriented Programming (OOP)
+- SOLID Principles & Design Patterns
+- Microsoft SQL Server Querying & PostgreSQL
+- C# Data Access with Entity Framework
+- Web Programming (HTML5, CSS3, Bootstrap, JavaScript)
+- React.js ile Front-End Geliştirme
+- Developing ASP.NET Core API
+- Gerçek Hayat Projeleri & Demo Sunumları
+
+Hedef Kazanımlar:
+- Bir web uygulamasını sıfırdan A'dan Z'ye geliştirebilme yetkinliği
+- .NET/C# back-end ve React front-end mimarilerine tam hakimiyet
+- Yazılım ekibiyle staj yaparak sektöre hazır iş deneyimi kazanma
+- Başarılı öğrenciler için Aloha Dijital bünyesinde işe alım değerlendirmesi
+
 ================= EĞİTİM VERİLERİ – BİTİŞ =================
 
 GENEL KURALLAR
@@ -365,7 +399,7 @@ Bu kurallara göre kullanıcı mesajına en uygun cevabı üret.
           item.content !== academicSystemInstructions &&
           !item.content.includes("Şu an çok yoğunum")
         )
-        .slice(-4); 
+        .slice(-4);
 
       const rawResponse = await this.callGeminiAPI(finalUserMsg, apiHistory, academicSystemInstructions);
 
