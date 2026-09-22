@@ -199,7 +199,7 @@ function guessSectionFromQuestion(q: string): string | null {
 }
 
 export class GeminiReportService {
-    private chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    private chatModel = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
 
     private async answerWithEvidenceOnly({ ideaId, reportId, jsonPath, evidence, question, history }) {
         const wantsList = /(^|\s)(list|bullets?|bullet points?|enumerate|number(ed)?\s+list|itemize|give me a list|show.*list)(\s|$)/i

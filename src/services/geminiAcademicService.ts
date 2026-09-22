@@ -1,6 +1,6 @@
 // @ts-nocheck 
 
-import axios from "axios";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 
 const FORCE_PARAGRAPH_HINT =
@@ -53,83 +53,61 @@ function smartShorten(text: string, maxWords = 50) {
 
 dotenv.config();
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is not defined in environment variables");
-}
-
 export class GeminiAcademicService {
-  private apiKey = process.env.GEMINI_API_KEY;
+  private getApiKey(): string {
+    return (process.env.GEMINI_API_KEY || "").trim().replace(/^["']|["']$/g, "");
+  }
 
   private async callGeminiAPI(message: string, history: any[], systemPrompt: string, retryCount = 0): Promise<string> {
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
-    const maxRetries = 3;
-    const baseDelay = 2000;
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not defined in environment variables");
+    }
 
-    const contents = [
-      {
-        role: 'user',
-        parts: [{ text: "SİSTEM TALİMATI:\n" + systemPrompt }]
-      },
-      {
-        role: 'model',
-        parts: [{ text: "Anladım, kurallara ve eğitim verilerine sadık kalarak, samimi ve kısa cevaplar vereceğim." }]
-      },
-      ...history.map((item) => ({
-        role: item.role === 'assistant' ? 'model' : item.role,
-        parts: [{ text: item.content }]
-      })),
-      {
-        role: 'user',
-        parts: [{ text: message }]
-      }
-    ];
-
-    const body = {
-      contents,
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3.6-flash",
+      systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0.4,
-        maxOutputTokens: 1024,
-        thinkingConfig: {
-          thinkingLevel: "LOW"
-        }
+        maxOutputTokens: 1024
       }
-    };
+    });
 
     try {
-      const response = await axios.post(url, body, {
-        timeout: 30000,
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": this.apiKey
-        }
+      const formattedHistory = history
+        .filter((item) => item.content && item.content.trim())
+        .map((item) => ({
+          role: item.role === 'assistant' ? 'model' : item.role,
+          parts: [{ text: item.content }]
+        }));
+
+      while (formattedHistory.length > 0 && formattedHistory[0].role !== 'user') {
+        formattedHistory.shift();
+      }
+
+      const chat = model.startChat({
+        history: formattedHistory
       });
 
-      console.log("🧪 Gemini full response:", JSON.stringify(response.data, null, 2));
+      const result = await chat.sendMessage(message);
+      const response = await result.response;
+      const text = response.text();
 
-      if (!response.data.candidates || !response.data.candidates[0] || !response.data.candidates[0].content) {
-        throw new Error('API yanıtı beklenen formatta değil');
-      }
-
-      return response.data.candidates[0].content.parts[0].text.trim();
+      return text ? text.trim() : "";
 
     } catch (error: any) {
-      if (error.response?.status === 429) {
-        const retryAfter = error.response.headers['retry-after'] || Math.pow(2, retryCount) * 2;
-        console.warn(`⚠️ Gemini Rate Limit! ${retryAfter} saniye bekleniyor...`);
-        await delay(retryAfter * 1000);
+      console.error("❌ Gemini API hata detayı:", error);
 
-        if (retryCount < maxRetries) {
-          return this.callGeminiAPI(message, history, systemPrompt, retryCount + 1);
-        }
-      }
-
-      if (error.response?.status >= 500 && retryCount < maxRetries) {
-        const delayMs = baseDelay * Math.pow(2, retryCount);
+      if (error.status === 429 && retryCount < 3) {
+        const delayMs = 2000 * Math.pow(2, retryCount);
+        console.warn(`⚠️ Gemini Rate Limit! ${delayMs / 1000} saniye bekleniyor...`);
         await delay(delayMs);
         return this.callGeminiAPI(message, history, systemPrompt, retryCount + 1);
       }
 
-      throw new Error(`AI yanıtı alınamadı: ${error.message}`);
+      const detailedMsg = error.message || "Bilinmeyen API hatası";
+      throw new Error(`AI yanıtı alınamadı: ${detailedMsg}`);
     }
   }
 
@@ -176,7 +154,7 @@ YANIT UZUNLUĞU
 - Çok konu varsa kısa özet yap ve hangisini açmak istediğini sor.
 
 EĞİTİM KAPSAMI
-- SADECE yazılım eğitimleri: Front-End, Back-End, AI Developer.
+- SADECE yazılım ve AI eğitimleri: Front-End, Back-End, AI Developer, React Native, Full Stack, AI Dijital Ürün Uzmanlığı.
 - Dijital pazarlama, sosyal medya vb. önerme.
 
 TİPİK İTİRAZLAR (paragraf halinde cevapla)
@@ -238,7 +216,7 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
   - Temel Seviye: 120 saat  
   - İleri Seviye: 80 saat
 - Format: Online (Zoom), ders kayıtları erişilebilir
-- Eğitim başlangıç tarihi: Temmuz 2026
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
 - Staj: 4 hafta
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -276,7 +254,7 @@ Hedef Kazanımlar:
 ------------------------------------------------
 2) REACT NATIVE DEVELOPER EĞİTİMİ
 - Toplam Süre: 90 saat + Proje + Staj + Network
-- Eğitim başlangıç tarihi: Temmuz 2026
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta İçi: Pazartesi/Çarşamba/Cuma 19:00–22:00
@@ -304,7 +282,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 100 saat teknik eğitim (6 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 3 hafta
 - Staj Süresi: 3 hafta
-- Eğitim başlangıç tarihi: Temmuz 2026
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -334,7 +312,7 @@ Hedef Kazanımlar:
 - Toplam Süre: 120 saat teknik eğitim (10 hafta, haftada 4 gün: 2 gün hafta içi + 2 gün hafta sonu)
 - Proje Süresi: 4 hafta
 - Staj Süresi: 4 hafta
-- Eğitim başlangıç tarihi: Temmuz 2026
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
@@ -381,6 +359,33 @@ Hedef Kazanımlar:
 - .NET/C# back-end ve React front-end mimarilerine tam hakimiyet
 - Yazılım ekibiyle staj yaparak sektöre hazır iş deneyimi kazanma
 - Başarılı öğrenciler için Aloha Dijital bünyesinde işe alım değerlendirmesi
+
+------------------------------------------------
+6) AI DİJİTAL ÜRÜN UZMANLIĞI EĞİTİMİ
+- Toplam Süre: 15 saat (Canlı & uygulamalı)
+- Eğitim başlangıç tarihi: 5 Ekim 2026
+- Format: Online (Zoom), canlı ve uygulamalı, ders kayıtları erişilebilir
+- Ön Koşul: Kodlama bilgisi / teknik geçmiş gerektirmez (sıfırdan başlayanlar ve fikrini dijital ürüne dönüştürmek isteyenler için uygundur)
+- Ücret: 4.990 TL
+- Eğitmenler: Yusuf Şahin (Kıdemli Developer), Orkide Ercüment (Aloha Dijital CEO)
+- Sonraki Adım: AI ile Web & Mobil Uygulama Geliştirme Uzmanlık Programı'na hazırlık sağlar
+
+**Ders Programı / Modüller**
+- 01 Yapay Zeka ile Üretim Mantığı (Prompting, context kullanımı, çıktı iyileştirme, AI'yı çalışma ortağına dönüştürme)
+- 02 AI ile Fikirden Dijital Ürüne (Problem, hedef kullanıcı, çözüm, özellik listesi ve MVP yol haritası)
+- 03 Web ve Mobil Uygulamalar Nasıl Çalışır? (Frontend, backend, veri tabanı, API, kullanıcı girişi, ödeme, bildirim ve bulut kavramları)
+- 04 AI ile UI/UX, Görsel ve Prototip (Kullanıcı akışı, wireframe, ekran tasarımı, logo/ikon, ürün görseli, video ve temel prototip üretimi)
+- 05 AI ile Web Sitesi Oluşturma (AI coding yaklaşımıyla landing page oluşturma, kod okuma ve AI ile düzeltme)
+- 06 AI ile Mobil Uygulama Planlama (Ekran yapısı, navigation, kullanıcı senaryoları, veri ihtiyacı ve mobil uygulama prototipi)
+- 07 API, Veri ve AI Entegrasyonları (Chatbot, ödeme, harita, görsel/ses analizi gibi özelliklerin temel entegrasyonu)
+- 08 Kendi Dijital Ürününü Tasarla (Kendi projesi için ürün dosyası, ekran listesi, kullanıcı akışı ve geliştirme yol haritası)
+
+Uygulamalı Çıktı & Hedef Kazanımlar:
+- Kodlama bilgisi gerekmeden bir fikri dijital ürün ve MVP yaklaşımıyla yapılandırma
+- Web ve mobil uygulamaların temel çalışma mantığını ve terminolojisini teknik olmayan dille anlama
+- AI araçlarıyla ekran tasarımı, prototip, tanıtım görselleri ve kısa videolar üretebilme
+- Basit web projeleri (landing page) oluşturma ve mobil uygulama planı/teknik yol haritası çıkarma
+- İleri seviye Web & Mobil uygulama geliştirme programlarına güçlü hazırlık
 
 ================= EĞİTİM VERİLERİ – BİTİŞ =================
 

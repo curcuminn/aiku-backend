@@ -169,8 +169,8 @@ interface ScrapeResult {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  private chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  private model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+  private chatModel = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
 
   private cleanJsonString(text: string): string {
     text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
