@@ -1,3 +1,6 @@
+import dns from "dns";
+dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+
 import express, { Request, Response } from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
@@ -55,6 +58,7 @@ import revenueCatRoutes from "./routes/revenueCatRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import reportChatRoutes from "./routes/reportChat";
 import trainingApplicationRoutes from "./routes/trainingApplicationRoutes";
+import academyPaymentRoutes from "./routes/academyPaymentRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -684,6 +688,7 @@ app.use("/api/revenuecat", revenueCatRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/report-chat", reportChatRoutes);
 app.use("/api/training-applications", trainingApplicationRoutes);
+app.use("/api/academy-payment", academyPaymentRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

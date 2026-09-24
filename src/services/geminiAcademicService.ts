@@ -154,7 +154,7 @@ YANIT UZUNLUĞU
 - Çok konu varsa kısa özet yap ve hangisini açmak istediğini sor.
 
 EĞİTİM KAPSAMI
-- SADECE yazılım ve AI eğitimleri: Front-End, Back-End, AI Developer, React Native, Full Stack, AI Dijital Ürün Uzmanlığı.
+- SADECE yazılım ve AI eğitimleri: Front-End, Back-End, AI Developer, React Native, Full Stack, AI Dijital Ürün Uzmanlığı, 30 Saatte Kendi Mobil Uygulamanı Geliştir.
 - Dijital pazarlama, sosyal medya vb. önerme.
 
 TİPİK İTİRAZLAR (paragraf halinde cevapla)
@@ -385,7 +385,28 @@ Uygulamalı Çıktı & Hedef Kazanımlar:
 - Web ve mobil uygulamaların temel çalışma mantığını ve terminolojisini teknik olmayan dille anlama
 - AI araçlarıyla ekran tasarımı, prototip, tanıtım görselleri ve kısa videolar üretebilme
 - Basit web projeleri (landing page) oluşturma ve mobil uygulama planı/teknik yol haritası çıkarma
-- İleri seviye Web & Mobil uygulama geliştirme programlarına güçlü hazırlık
+------------------------------------------------
+7) 30 SAATTE KENDİ MOBİL UYGULAMANI GELİŞTİR (BOOTCAMP)
+- Toplam Süre: 30 saat
+- Format: Online (Zoom), canlı ve kayıtlı dersler (tüm dersler kaydedilir, kaçırılan dersler sonradan izlenebilir)
+- Saatler: Salı & Perşembe 19:30–22:30 (Sınırlı Kontenjan)
+- Eğitmen: Yusuf Şahin (Kıdemli Developer) mentorluğunda proje temelli eğitim
+- Eğitim başlangıç tarihi: Kayıt zamanı duyurulacaktır.
+- Ücret: 30.000 TL (12 aya varan taksit imkânı)
+- Ön Koşul / Yaklaşım: "Zamanım yok" veya "Kod yazmak çok zor" bahanelerini rafa kaldıran; yapay zeka asistanlığı ve birebir mentorlukla hızlandırılmış pratik kamp.
+
+**Ders Programı & Müfredat Adımları**
+- Sıfırdan eksiksiz ve çalışan bir mobil uygulama mimarisi kurma
+- Geliştirme sürecinin her aşamasında yapay zeka asistanlarını (AI coding tools) etkin kullanma
+- Modern mobil UI ekranları, navigasyon ve kullanıcı senaryoları tasarlama
+- Yayına hazır proje mimarisi ve veri yönetimi yapılandırma
+- App Store & Google Play mağaza yayın hazırlık süreçlerini eksiksiz tamamlama
+- Gerçek dünya mobil geliştirme iş akışını ve canlı proje deneyimini deneyimleme
+
+Hedef Kazanımlar:
+- 30 saat gibi kısa bir sürede sıfırdan çalışan ve mağazalara yüklenebilecek seviyede bir mobil uygulama üretme
+- Yapay zekayı yazılım ve mobil geliştirme süreçlerinde bir kaldıraç olarak yönetebilme
+- Mağaza yayın standartları ve proje mimarisi konusunda pratik tecrübe
 
 ================= EĞİTİM VERİLERİ – BİTİŞ =================
 
