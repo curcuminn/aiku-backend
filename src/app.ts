@@ -59,6 +59,7 @@ import notificationRoutes from "./routes/notificationRoutes";
 import reportChatRoutes from "./routes/reportChat";
 import trainingApplicationRoutes from "./routes/trainingApplicationRoutes";
 import academyPaymentRoutes from "./routes/academyPaymentRoutes";
+import { PanelUser } from "./models/PanelUser";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -78,11 +79,21 @@ const whitelist = [
   "https://aikuaihub.com",
   "https://www.aikuaihub.com",
   "https://api.aikuaihub.com",
+  "https://panel.aikuaihub.com",
   "https://www.alohadijital.com",
   "https://alohadijital.com",
+  "https://panel.alohadijital.com",
+  "https://www.panel.alohadijital.com",
+  "https://alohadijitalpanel.vercel.app",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3004",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
   "http://127.0.0.1:5500",
   "https://bevakpqfycmxnpzrkecv.supabase.co",
   "https://posws.param.com.tr",
@@ -210,11 +221,29 @@ const corsOriginCheck = (
     return;
   }
 
-  // Wildcard subdomain kontrolü
+  // Wildcard subdomain kontrolü (Aiku)
   const isAikuDomain = origin.match(
-    /^https:\/\/([a-zA-Z0-9-]+\.)?aikuaihub\.com$/
+    /^https:\/\/([a-zA-Z0-9-]+\.)*aikuaihub\.com$/i
   );
   if (isAikuDomain) {
+    callback(null, true);
+    return;
+  }
+
+  // Aloha Dijital alan adları (*.alohadijital.com)
+  const isAlohaDomain = origin.match(
+    /^https:\/\/([a-zA-Z0-9-]+\.)*alohadijital\.com$/i
+  );
+  if (isAlohaDomain) {
+    callback(null, true);
+    return;
+  }
+
+  // Vercel deployment alan adları (*.vercel.app)
+  const isVercelDomain = origin.match(
+    /^https:\/\/([a-zA-Z0-9-]+\.)*vercel\.app$/i
+  );
+  if (isVercelDomain) {
     callback(null, true);
     return;
   }
@@ -642,10 +671,28 @@ cron.schedule(
 // MongoDB bağlantısı
 mongoose
   .connect(process.env.MONGODB_URI!)
-  .then(() => {
+  .then(async () => {
     console.log("✅ MongoDB bağlantısı başarılı");
     logger.info("MongoDB bağlantısı başarılı");
     startOfflineUpdater();
+
+    // Aloha Dijital Panel Master Admin kullanıcısını kontrol et/oluştur
+    try {
+      const existingAdmin = await PanelUser.findOne({ username: "adminaloha" });
+      if (!existingAdmin) {
+        const newAdmin = new PanelUser({
+          username: "adminaloha",
+          password: "Aloha2026*",
+          role: "admin",
+          totalEntries: 0,
+          dailyEntries: 0,
+        });
+        await newAdmin.save();
+        console.log("✅ Default panel master admin 'adminaloha' oluşturuldu.");
+      }
+    } catch (seedErr) {
+      console.error("Panel admin seed hatası:", seedErr);
+    }
   })
   .catch((err) => {
     console.log("❌ MongoDB bağlantı hatası:", err);
