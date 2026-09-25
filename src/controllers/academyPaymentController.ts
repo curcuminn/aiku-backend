@@ -82,8 +82,26 @@ export async function createCheckoutSession(req: Request, res: Response) {
 
     // If PayTR Credit / Debit Card
     if (paymentMethod === "paytr_card") {
-      const reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
-      const frontendUrl = (reqOrigin || process.env.FRONTEND_URL || "https://alohadijital.com").replace(/\/$/, "");
+      const clientPassedUrl =
+        req.body?.frontendUrl ||
+        (req.headers["x-frontend-url"] as string) ||
+        req.headers.origin ||
+        (req.headers.referer ? new URL(req.headers.referer).origin : null);
+
+      let frontendUrl = (
+        clientPassedUrl ||
+        process.env.ALOHA_FRONTEND_URL ||
+        process.env.FRONTEND_URL ||
+        "https://www.alohadijital.com"
+      ).replace(/\/$/, "");
+
+      // If accessed on live server or over HTTPS, ensure redirect URL is production domain
+      if (
+        (req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production") &&
+        frontendUrl.includes("localhost")
+      ) {
+        frontendUrl = "https://www.alohadijital.com";
+      }
 
       const tokenResult = await payTrService.createIframeToken({
         merchantOid: order.orderId,
