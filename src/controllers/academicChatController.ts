@@ -15,7 +15,7 @@ export const listSessions = async (
     req: Request<{}, any, any, ListSessionsQuery>,
     res: Response
 ) => {
-    const { page = "1", limit = "20", q = "", userId, participantName } = req.query;
+    const { page = "1", limit = "1000", q = "", userId, participantName } = req.query;
     const filter: any = {};
     if (userId) filter.user = userId;
     if (q) {
@@ -30,10 +30,13 @@ export const listSessions = async (
         filter.participantName = { $regex: participantName, $options: "i" };
     }
 
+    const maxLimit = Math.min(Math.max(1, +limit || 50), 1000);
+    const currentPage = Math.max(1, +page || 1);
+
     const sessions = await AcademicChatSession.find(filter)
         .sort({ updatedAt: -1 })
-        .skip((+page - 1) * +limit)
-        .limit(+limit)
+        .skip((currentPage - 1) * maxLimit)
+        .limit(maxLimit)
         .lean();
 
     const total = await AcademicChatSession.countDocuments(filter);
