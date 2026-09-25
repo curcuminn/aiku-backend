@@ -75,7 +75,17 @@
                                 📚 Kayıt Olunan Eğitim Programları
                             </div>
                             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; margin-bottom: 24px;">
-                                {{ params.COURSES_HTML }}
+                                {% for item in params.ITEMS %}
+                                <tr>
+                                    <td style="padding: 14px 0; border-bottom: 1px solid #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; color: #0f172a;">
+                                        {{ item.name }}
+                                        <div style="font-size: 12px; font-weight: normal; color: #64748b; margin-top: 3px;">Canlı & Uygulamalı Eğitim Programı</div>
+                                    </td>
+                                    <td style="padding: 14px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; color: #7c5dc4;">
+                                        {{ item.price }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
                                 <tr>
                                     <td style="padding: 16px 0 0 0; font-size: 15px; font-weight: 700; color: #09090b; border-top: 2px solid #e2e8f0;">
                                         Toplam Tutar (KDV Dahil)
@@ -108,15 +118,15 @@
                             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td align="center" style="padding-bottom: 12px;">
-                                        <a href="{{ params.SUPPORT_WHATSAPP }}" target="_blank" style="display: block; width: 100%; max-width: 320px; background-color: #16a34a; color: #ffffff; text-decoration: none; text-align: center; font-size: 14px; font-weight: 700; padding: 14px 24px; border-radius: 100px; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
+                                        <a href="{{ params.SUPPORT_WHATSAPP }}?utm_source=brevo&utm_medium=email&utm_campaign=aloha-dijital-kayit&utm_id=141" target="_blank" style="display: block; width: 100%; max-width: 320px; background-color: #16a34a; color: #ffffff; text-decoration: none; text-align: center; font-size: 14px; font-weight: 700; padding: 14px 24px; border-radius: 100px; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
                                             💬 WhatsApp Danışmanına Bağlan
                                         </a>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td align="center">
-                                        <a href="https://alohadijital.com/academy" target="_blank" style="display: inline-block; color: #64748b; text-decoration: underline; font-size: 13px; font-weight: 500;">
-                                            Akademi Portalı & Dersler
+                                        <a href="https://alohadijital.com/academy?utm_source=brevo&utm_medium=email&utm_campaign=aloha-dijital-kayit&utm_id=141" target="_blank" style="display: inline-block; color: #64748b; text-decoration: underline; font-size: 13px; font-weight: 500;">
+                                            Akademi Portalı & Eğitimler
                                         </a>
                                     </td>
                                 </tr>

@@ -171,6 +171,13 @@ class BrevoService {
             )
             .join('');
 
+        const formattedItems = orderData.items.map((item) => ({
+            name: item.name,
+            price: `${item.price.toLocaleString('tr-TR')} TL`,
+            rawPrice: item.price,
+            quantity: item.quantity || 1,
+        }));
+
         const params = {
             FIRST_NAME: orderData.firstName,
             LAST_NAME: orderData.lastName,
@@ -181,7 +188,7 @@ class BrevoService {
             COURSES_HTML: coursesHtml,
             PHONE: orderData.phone || '',
             SUPPORT_WHATSAPP: whatsappUrl,
-            ITEMS: orderData.items,
+            ITEMS: formattedItems,
         };
 
         const sendSmtpEmailWithTemplate = {
