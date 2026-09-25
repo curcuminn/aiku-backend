@@ -286,3 +286,61 @@ export async function getOrderDetails(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+
+export async function listAcademyOrders(req: Request, res: Response) {
+  try {
+    const { status, search, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const filter: any = {};
+    if (status) filter.paymentStatus = status;
+    if (search) {
+      filter.$or = [
+        { orderId: { $regex: search, $options: "i" } },
+        { "customer.firstName": { $regex: search, $options: "i" } },
+        { "customer.lastName": { $regex: search, $options: "i" } },
+        { "customer.email": { $regex: search, $options: "i" } },
+        { "customer.phone": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const total = await AcademyOrder.countDocuments(filter);
+    const orders = await AcademyOrder.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(parseInt(offset, 10))
+      .limit(parseInt(limit, 10));
+
+    return res.status(200).json({
+      success: true,
+      total,
+      data: orders,
+    });
+  } catch (error: any) {
+    logger.error("List academy orders error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function updateAcademyOrderStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { paymentStatus } = req.body;
+    const validStatuses = ["pending", "paid", "failed", "refunded"];
+    if (!validStatuses.includes(paymentStatus)) {
+      return res.status(400).json({ success: false, error: "Geçersiz statü." });
+    }
+
+    const order = await AcademyOrder.findByIdAndUpdate(
+      id,
+      { paymentStatus, ...(paymentStatus === "paid" ? { paidAt: new Date() } : {}) },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Sipariş bulunamadı." });
+    }
+
+    return res.status(200).json({ success: true, data: order });
+  } catch (error: any) {
+    logger.error("Update academy order status error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}

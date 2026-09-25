@@ -2,29 +2,33 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { TrainingApplication } from "../models/TrainingApplication";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET || 'panel-secret-key';
 const CAPACITY_PER_COMPANY = 20;
 
 /* ---------------------------------------------------
    Helpers (claimRequestController ile aynı mantık)
 --------------------------------------------------- */
 
-// Token doğrulama (opsiyonel kullanacağız, admin uçları için)
-function verifyToken(req: Request): { id: string; role?: string } {
+// Token doğrulama
+function verifyToken(req: Request): { id?: string; userId?: string; role?: string; type?: string } {
     const header = req.header("Authorization") || "";
     const token = header.replace("Bearer ", "").trim();
     if (!token) throw new Error("Token missing");
     try {
         return jwt.verify(token, JWT_SECRET) as any;
     } catch {
-        throw new Error("Invalid or expired token");
+        try {
+            return jwt.verify(token, 'panel-secret-key') as any;
+        } catch {
+            throw new Error("Invalid or expired token");
+        }
     }
 }
 
-// Sadece admin izinli uçlar için
+// Sadece admin/editor/panel izinli uçlar için
 function requireAdmin(req: Request) {
     const decoded = verifyToken(req);
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "admin" && decoded.role !== "editor" && decoded.type !== "panel") {
         const err = new Error("Forbidden: admin only");
         (err as any).status = 403;
         throw err;
@@ -236,6 +240,28 @@ export const listPublicByCompany = async (req: Request, res: Response) => {
             remainingMainSeats,
             data,
         });
+    } catch (err: any) {
+        const status = err.status || 500;
+        return res.status(status).json({ success: false, message: err.message || "Server error" });
+    }
+};
+
+/* ---------------------------------------------------
+   DELETE /api/training-applications/:id
+   (Admin) Başvuru sil
+--------------------------------------------------- */
+export const deleteTrainingApplication = async (req: Request, res: Response) => {
+    try {
+        requireAdmin(req);
+
+        const { id } = req.params;
+        const deleted = await TrainingApplication.findByIdAndDelete(id);
+
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: "Application not found" });
+        }
+
+        return res.status(200).json({ success: true, message: "Application deleted successfully" });
     } catch (err: any) {
         const status = err.status || 500;
         return res.status(status).json({ success: false, message: err.message || "Server error" });

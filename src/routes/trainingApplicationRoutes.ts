@@ -6,6 +6,7 @@ import {
     listTrainingApplications,
     updateApplicationStatus,
     listPublicByCompany,
+    deleteTrainingApplication,
 } from "../controllers/trainingApplicationController";
 
 const router = Router();
@@ -24,16 +25,22 @@ router.post("/", createTrainingApplication);
 router.get("/public", listPublicByCompany);
 
 /**
- * PUBLIC: Tüm başvuruları listele (opsiyonel filtrelerle)
+ * (Admin): Tüm başvuruları listele (opsiyonel filtrelerle)
  * GET /api/training-applications?trainingKey=...&event=...&company=...&status=Main|Waitlist&limit=&offset=
  */
 router.get("/", listTrainingApplications);
 
 /**
- * PUBLIC: Statü güncelle (ör. manuel terfi/iptal)
+ * (Admin): Statü güncelle (ör. manuel terfi/iptal)
  * PATCH /api/training-applications/:id/status
  * Body: { status: "Main" | "Waitlist" }
  */
 router.patch("/:id/status", updateApplicationStatus);
+
+/**
+ * (Admin): Başvuru sil
+ * DELETE /api/training-applications/:id
+ */
+router.delete("/:id", deleteTrainingApplication);
 
 export default router;

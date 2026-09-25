@@ -4,9 +4,17 @@ import {
   handlePayTrCallback,
   getOrderDetails,
   sendTestAcademyEmail,
+  listAcademyOrders,
+  updateAcademyOrderStatus,
 } from "../controllers/academyPaymentController";
 
 const router = express.Router();
+
+// List all academy orders
+router.get("/orders", listAcademyOrders);
+
+// Update academy order payment status
+router.patch("/orders/:id/status", updateAcademyOrderStatus);
 
 // Create checkout session (generates PayTR iframe token or bank transfer info)
 router.post("/create-checkout", createCheckoutSession);
